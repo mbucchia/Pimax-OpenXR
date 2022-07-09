@@ -34,6 +34,80 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "companion", "companion\comp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pimax_cli", "pimax_cli\pimax_cli.vcxproj", "{C3EF2FE7-770A-448E-A3AC-226276092ABF}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TESTS", "TESTS", "{B8EE0771-3825-484A-A3E5-92CF5568B86F}"
+EndProject
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "StereoKitCTest", "..\..\Engines\StereoKit\bin\x64_Debug\StereoKitCTest\StereoKitCTest.exe", "{19694284-F592-4CB4-8C8D-719CF044BC38}"
+	ProjectSection(DebuggerProjectSystem) = preProject
+		PortSupplier = 00000000-0000-0000-0000-000000000000
+		Executable = D:\XRAE\Engines\StereoKit\bin\x64_Debug\StereoKitCTest\StereoKitCTest.exe
+		RemoteMachine = DESKTOP-T5E192B
+		StartingDirectory = D:\XRAE\Engines\StereoKit\bin\x64_Debug\StereoKitCTest
+		Environment = Default
+		LaunchingEngine = 00000000-0000-0000-0000-000000000000
+		UseLegacyDebugEngines = No
+		LaunchSQLEngine = No
+		AttachLaunchAction = No
+		IORedirection = Auto
+	EndProjectSection
+EndProject
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "dxHelloworld1", "..\HelloVR\dxHelloworld1.exe", "{6D081AB4-6D00-471D-9AB2-FE373E152217}"
+	ProjectSection(DebuggerProjectSystem) = preProject
+		PortSupplier = 00000000-0000-0000-0000-000000000000
+		Executable = D:\XRAE\Stuff\HelloVR\dxHelloworld1.exe
+		RemoteMachine = DESKTOP-T5E192B
+		StartingDirectory = D:\XRAE\Stuff\HelloVR
+		Environment = Default
+		LaunchingEngine = 00000000-0000-0000-0000-000000000000
+		UseLegacyDebugEngines = No
+		LaunchSQLEngine = No
+		AttachLaunchAction = No
+		IORedirection = Auto
+	EndProjectSection
+EndProject
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "XrPlaySpace_win32", "..\..\WinXR\bin\Debug\x64\XrPlaySpace_win32.exe", "{98AD8130-BD4E-4716-A7E8-DED977F59F34}"
+	ProjectSection(DebuggerProjectSystem) = preProject
+		PortSupplier = 00000000-0000-0000-0000-000000000000
+		Executable = D:\XRAE\WinXR2\bin\Release\x64\XrPlaySpace_win32.exe
+		RemoteMachine = DESKTOP-T5E192B
+		StartingDirectory = D:\XRAE\WinXR\bin\Debug\x64
+		Environment = Default
+		LaunchingEngine = 00000000-0000-0000-0000-000000000000
+		UseLegacyDebugEngines = No
+		LaunchSQLEngine = No
+		AttachLaunchAction = No
+		IORedirection = Auto
+	EndProjectSection
+EndProject
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "HelloXR", "..\..\WinXR\bin\Debug\x64\HelloXR.exe", "{0B109954-2DAC-488A-83D2-E917DAB707B7}"
+	ProjectSection(DebuggerProjectSystem) = preProject
+		PortSupplier = 00000000-0000-0000-0000-000000000000
+		Executable = D:\XRAE\WinXR\bin\Debug\x64\HelloXR.exe
+		RemoteMachine = DESKTOP-T5E192B
+		StartingDirectory = D:\XRAE\WinXR\bin\Debug\x64
+		Arguments = -g d3d12
+		Environment = Default
+		LaunchingEngine = 00000000-0000-0000-0000-000000000000
+		UseLegacyDebugEngines = No
+		LaunchSQLEngine = No
+		AttachLaunchAction = No
+		IORedirection = Auto
+	EndProjectSection
+EndProject
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "hello_xr", "..\..\hello_xr.exe", "{C82D8C7F-3390-4D55-A7FC-B78F7AA5AB7B}"
+	ProjectSection(DebuggerProjectSystem) = preProject
+		PortSupplier = 00000000-0000-0000-0000-000000000000
+		Executable = D:\XRAE\hello_xr.exe
+		RemoteMachine = DESKTOP-T5E192B
+		StartingDirectory = D:\XRAE
+		Arguments = -g vulkan
+		Environment = Default
+		LaunchingEngine = 00000000-0000-0000-0000-000000000000
+		UseLegacyDebugEngines = No
+		LaunchSQLEngine = No
+		AttachLaunchAction = No
+		IORedirection = Auto
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -71,6 +145,26 @@ Global
 		{C3EF2FE7-770A-448E-A3AC-226276092ABF}.Release|Win32.Build.0 = Release|Win32
 		{C3EF2FE7-770A-448E-A3AC-226276092ABF}.Release|x64.ActiveCfg = Release|x64
 		{C3EF2FE7-770A-448E-A3AC-226276092ABF}.Release|x64.Build.0 = Release|x64
+		{19694284-F592-4CB4-8C8D-719CF044BC38}.Debug|Win32.ActiveCfg = Release|x64
+		{19694284-F592-4CB4-8C8D-719CF044BC38}.Debug|x64.ActiveCfg = Release|x64
+		{19694284-F592-4CB4-8C8D-719CF044BC38}.Release|Win32.ActiveCfg = Release|x64
+		{19694284-F592-4CB4-8C8D-719CF044BC38}.Release|x64.ActiveCfg = Release|x64
+		{6D081AB4-6D00-471D-9AB2-FE373E152217}.Debug|Win32.ActiveCfg = Release|x64
+		{6D081AB4-6D00-471D-9AB2-FE373E152217}.Debug|x64.ActiveCfg = Release|x64
+		{6D081AB4-6D00-471D-9AB2-FE373E152217}.Release|Win32.ActiveCfg = Release|x64
+		{6D081AB4-6D00-471D-9AB2-FE373E152217}.Release|x64.ActiveCfg = Release|x64
+		{98AD8130-BD4E-4716-A7E8-DED977F59F34}.Debug|Win32.ActiveCfg = Release|x64
+		{98AD8130-BD4E-4716-A7E8-DED977F59F34}.Debug|x64.ActiveCfg = Release|x64
+		{98AD8130-BD4E-4716-A7E8-DED977F59F34}.Release|Win32.ActiveCfg = Release|x64
+		{98AD8130-BD4E-4716-A7E8-DED977F59F34}.Release|x64.ActiveCfg = Release|x64
+		{0B109954-2DAC-488A-83D2-E917DAB707B7}.Debug|Win32.ActiveCfg = Release|x64
+		{0B109954-2DAC-488A-83D2-E917DAB707B7}.Debug|x64.ActiveCfg = Release|x64
+		{0B109954-2DAC-488A-83D2-E917DAB707B7}.Release|Win32.ActiveCfg = Release|x64
+		{0B109954-2DAC-488A-83D2-E917DAB707B7}.Release|x64.ActiveCfg = Release|x64
+		{C82D8C7F-3390-4D55-A7FC-B78F7AA5AB7B}.Debug|Win32.ActiveCfg = Release|x64
+		{C82D8C7F-3390-4D55-A7FC-B78F7AA5AB7B}.Debug|x64.ActiveCfg = Release|x64
+		{C82D8C7F-3390-4D55-A7FC-B78F7AA5AB7B}.Release|Win32.ActiveCfg = Release|x64
+		{C82D8C7F-3390-4D55-A7FC-B78F7AA5AB7B}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -78,6 +172,11 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{BA775DE9-671E-4E3B-92AC-9828C2AAF490} = {A53ED6CB-95D3-4833-8A16-C6A588F16F6E}
 		{8F6FBE40-3313-449F-ABA0-D7AB4578BC51} = {A53ED6CB-95D3-4833-8A16-C6A588F16F6E}
+		{19694284-F592-4CB4-8C8D-719CF044BC38} = {B8EE0771-3825-484A-A3E5-92CF5568B86F}
+		{6D081AB4-6D00-471D-9AB2-FE373E152217} = {B8EE0771-3825-484A-A3E5-92CF5568B86F}
+		{98AD8130-BD4E-4716-A7E8-DED977F59F34} = {B8EE0771-3825-484A-A3E5-92CF5568B86F}
+		{0B109954-2DAC-488A-83D2-E917DAB707B7} = {B8EE0771-3825-484A-A3E5-92CF5568B86F}
+		{C82D8C7F-3390-4D55-A7FC-B78F7AA5AB7B} = {B8EE0771-3825-484A-A3E5-92CF5568B86F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {07E77829-9766-4585-AC6C-0A28BA014E77}
