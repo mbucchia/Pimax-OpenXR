@@ -233,7 +233,7 @@ namespace pimax_openxr {
                                                     uint32_t count,
                                                     bool interop) {
         // Detect whether this is the first call for this swapchain.
-        const bool initialized = !xrSwapchain.slices[0].empty();
+        const bool initialized = !xrSwapchain.d3dSlices[0].empty();
 
         // PVR does not properly support certain depth format, and we will need an intermediate texture for the
         // app to use, then perform additional conversion steps during xrEndFrame().
@@ -309,7 +309,7 @@ namespace pimax_openxr {
                     m_pvrSession, xrSwapchain.pvrSwapchain[0], i, IID_PPV_ARGS(&swapchainTexture)));
                 setDebugName(swapchainTexture, fmt::format("Runtime Texture[{}, {}]", i, (void*)&xrSwapchain));
 
-                xrSwapchain.slices[0].push_back(swapchainTexture);
+                xrSwapchain.d3dSlices[0].push_back(swapchainTexture);
                 if (i == 0) {
                     traceTexture(swapchainTexture, "PVR");
                 }
@@ -329,7 +329,7 @@ namespace pimax_openxr {
             }
 
             d3d11Images[i].texture =
-                !xrSwapchain.needDepthResolve ? xrSwapchain.slices[0][i] : xrSwapchain.images[i].Get();
+                !xrSwapchain.needDepthResolve ? xrSwapchain.d3dSlices[0][i] : xrSwapchain.images[i].Get();
 
             if (!interop) {
                 if (i == 0) {
@@ -347,7 +347,7 @@ namespace pimax_openxr {
     }
 
     // Prepare a PVR swapchain to be used by PVR.
-    void OpenXrRuntime::prepareAndCommitSwapchainImage(
+    void OpenXrRuntime::prepareAndCommitSwapchainImageD3D11(
         Swapchain& xrSwapchain, uint32_t slice, std::set<std::pair<pvrTextureSwapChain, uint32_t>>& committed) const {
         // If the texture was already committed, do nothing.
         if (committed.count(std::make_pair(xrSwapchain.pvrSwapchain[0], slice))) {
@@ -368,7 +368,7 @@ namespace pimax_openxr {
 
                 int count = -1;
                 CHECK_PVRCMD(pvr_getTextureSwapChainLength(m_pvrSession, xrSwapchain.pvrSwapchain[slice], &count));
-                if (count != xrSwapchain.slices[0].size()) {
+                if (count != xrSwapchain.d3dSlices[0].size()) {
                     throw std::runtime_error("Swapchain image count mismatch");
                 }
 
@@ -380,7 +380,7 @@ namespace pimax_openxr {
                     setDebugName(texture,
                                  fmt::format("Runtime Sliced Texture[{}, {}, {}]", slice, i, (void*)&xrSwapchain));
 
-                    xrSwapchain.slices[slice].push_back(texture);
+                    xrSwapchain.d3dSlices[slice].push_back(texture);
                 }
             }
 
@@ -391,12 +391,12 @@ namespace pimax_openxr {
 
             if (!xrSwapchain.needDepthResolve) {
                 int pvrSourceIndex = xrSwapchain.pvrLastReleasedIndex;
-                m_d3d11DeviceContext->CopySubresourceRegion(xrSwapchain.slices[slice][pvrDestIndex],
+                m_d3d11DeviceContext->CopySubresourceRegion(xrSwapchain.d3dSlices[slice][pvrDestIndex],
                                                             0,
                                                             0,
                                                             0,
                                                             0,
-                                                            xrSwapchain.slices[0][pvrSourceIndex],
+                                                            xrSwapchain.d3dSlices[0][pvrSourceIndex],
                                                             slice,
                                                             nullptr);
             } else {
@@ -460,7 +460,7 @@ namespace pimax_openxr {
 
                 // Final copy into the PVR texture.
                 m_d3d11DeviceContext->CopySubresourceRegion(
-                    xrSwapchain.slices[slice][pvrDestIndex], 0, 0, 0, 0, xrSwapchain.resolved.Get(), 0, nullptr);
+                    xrSwapchain.d3dSlices[slice][pvrDestIndex], 0, 0, 0, 0, xrSwapchain.resolved.Get(), 0, nullptr);
             }
         } else {
             // The app may render to certain swapchains (eg: quad layers) at a lower frame rate. We must perform a copy
@@ -469,12 +469,12 @@ namespace pimax_openxr {
             CHECK_PVRCMD(
                 pvr_getTextureSwapChainCurrentIndex(m_pvrSession, xrSwapchain.pvrSwapchain[0], &pvrCurrentIndex));
             if (pvrCurrentIndex != xrSwapchain.pvrLastReleasedIndex) {
-                m_d3d11DeviceContext->CopySubresourceRegion(xrSwapchain.slices[0][pvrCurrentIndex],
+                m_d3d11DeviceContext->CopySubresourceRegion(xrSwapchain.d3dSlices[0][pvrCurrentIndex],
                                                             0,
                                                             0,
                                                             0,
                                                             0,
-                                                            xrSwapchain.slices[0][xrSwapchain.pvrLastReleasedIndex],
+                                                            xrSwapchain.d3dSlices[0][xrSwapchain.pvrLastReleasedIndex],
                                                             0,
                                                             nullptr);
             }
@@ -487,9 +487,11 @@ namespace pimax_openxr {
 
     // Flush any pending work.
     void OpenXrRuntime::flushD3D11Context() {
-        wil::unique_handle eventHandle;
-        m_d3d11DeviceContext->Flush1(D3D11_CONTEXT_TYPE_ALL, eventHandle.get());
-        WaitForSingleObject(eventHandle.get(), INFINITE);
+        if (m_d3d11DeviceContext) {
+            wil::unique_handle eventHandle;
+            m_d3d11DeviceContext->Flush1(D3D11_CONTEXT_TYPE_ALL, eventHandle.get());
+            WaitForSingleObject(eventHandle.get(), INFINITE);
+        }
     }
 
 } // namespace pimax_openxr

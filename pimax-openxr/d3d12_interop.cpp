@@ -191,7 +191,7 @@ namespace pimax_openxr {
                                                     XrSwapchainImageD3D12KHR* d3d12Images,
                                                     uint32_t count) {
         // Detect whether this is the first call for this swapchain.
-        const bool initialized = !xrSwapchain.slices[0].empty();
+        const bool initialized = !xrSwapchain.d3dSlices[0].empty();
 
         std::vector<XrSwapchainImageD3D11KHR> d3d11Images(count, {XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
         if (!initialized) {

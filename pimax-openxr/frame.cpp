@@ -295,6 +295,9 @@ namespace pimax_openxr {
                 return XR_ERROR_CALL_ORDER_INVALID;
             }
 
+            // This will be a no-op if OpenGL is not used.
+            GlContextSwitch context(m_glContext);
+
             // Serializes the app work between D3D12/Vulkan and D3D11.
             if (isD3D12Session()) {
                 serializeD3D12Frame();

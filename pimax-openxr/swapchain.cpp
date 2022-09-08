@@ -246,6 +246,21 @@ namespace pimax_openxr {
                 VK_FORMAT_B10G11R11_UFLOAT_PACK32,
             // clang-format on
         };
+        static const GLenum glFormats[] = {
+            // clang-format off
+                GL_SRGB8_ALPHA8, // Prefer SRGB formats.
+                GL_RGBA8,
+
+                GL_RGBA16F,
+                GL_DEPTH_COMPONENT32F, // Prefer 32-bit depth.
+                GL_DEPTH24_STENCIL8,
+                GL_DEPTH_COMPONENT16,
+                // We don't advertise GL_DEPTH32F_STENCIL8 as it appears to be problematic with PVR.
+
+                GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,
+                GL_R11F_G11F_B10F,
+            // clang-format on
+        };
 
         TraceLoggingWrite(g_traceProvider,
                           "xrEnumerateSwapchainFormats",
@@ -256,7 +271,9 @@ namespace pimax_openxr {
             return XR_ERROR_HANDLE_INVALID;
         }
 
-        const uint32_t count = isVulkanSession() ? ARRAYSIZE(vkFormats) : ARRAYSIZE(d3dFormats);
+        const uint32_t count = isVulkanSession()   ? ARRAYSIZE(vkFormats)
+                               : isOpenGLSession() ? ARRAYSIZE(glFormats)
+                                                   : ARRAYSIZE(d3dFormats);
 
         if (formatCapacityInput && formatCapacityInput < count) {
             return XR_ERROR_SIZE_INSUFFICIENT;
@@ -270,6 +287,8 @@ namespace pimax_openxr {
             for (uint32_t i = 0; i < *formatCountOutput; i++) {
                 if (isVulkanSession()) {
                     formats[i] = (int64_t)vkFormats[i];
+                } else if (isOpenGLSession()) {
+                    formats[i] = (int64_t)glFormats[i];
                 } else {
                     formats[i] = (int64_t)d3dFormats[i];
                 }
@@ -322,12 +341,12 @@ namespace pimax_openxr {
 
         pvrTextureSwapChainDesc desc{};
 
-        desc.Format = isVulkanSession() ? vkToPvrTextureFormat((VkFormat)createInfo->format)
-                                        : dxgiToPvrTextureFormat((DXGI_FORMAT)createInfo->format);
+        desc.Format = isVulkanSession()   ? vkToPvrTextureFormat((VkFormat)createInfo->format)
+                      : isOpenGLSession() ? glToPvrTextureFormat((GLenum)createInfo->format)
+                                          : dxgiToPvrTextureFormat((DXGI_FORMAT)createInfo->format);
         if (desc.Format == PVR_FORMAT_UNKNOWN) {
             return XR_ERROR_SWAPCHAIN_FORMAT_UNSUPPORTED;
         }
-        desc.MiscFlags = pvrTextureMisc_DX_Typeless; // OpenXR requires to return typeless texures.
 
         // Request a swapchain from PVR.
         desc.Type = pvrTexture_2D;
@@ -341,14 +360,17 @@ namespace pimax_openxr {
         }
         desc.SampleCount = createInfo->sampleCount;
 
-        if (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) {
-            desc.BindFlags |= pvrTextureBind_DX_RenderTarget;
-        }
-        if (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-            desc.BindFlags |= pvrTextureBind_DX_DepthStencil;
-        }
-        if (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT) {
-            desc.BindFlags |= pvrTextureBind_DX_UnorderedAccess;
+        if (!isOpenGLSession()) {
+            if (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT) {
+                desc.BindFlags |= pvrTextureBind_DX_RenderTarget;
+            }
+            if (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+                desc.BindFlags |= pvrTextureBind_DX_DepthStencil;
+            }
+            if (createInfo->usageFlags & XR_SWAPCHAIN_USAGE_UNORDERED_ACCESS_BIT) {
+                desc.BindFlags |= pvrTextureBind_DX_UnorderedAccess;
+            }
+            desc.MiscFlags = pvrTextureMisc_DX_Typeless; // OpenXR requires to return typeless texures.
         }
 
         // There are 2 situations in PVR where we cannot use the PVR swapchain alone:
@@ -365,12 +387,13 @@ namespace pimax_openxr {
             desc.Format = PVR_FORMAT_D32_FLOAT;
             needDepthResolve = true;
         }
-        CHECK_PVRCMD(pvr_createTextureSwapChainDX(m_pvrSession, m_d3d11Device.Get(), &desc, &pvrSwapchain));
+        createSwapchain(&desc, &pvrSwapchain);
 
         // Create the internal struct.
         Swapchain& xrSwapchain = *new Swapchain;
         xrSwapchain.pvrSwapchain.push_back(pvrSwapchain);
-        xrSwapchain.slices.push_back({});
+        xrSwapchain.d3dSlices.push_back({});
+        xrSwapchain.glSlices.push_back({});
         xrSwapchain.imagesResourceView.push_back({});
         xrSwapchain.pvrDesc = desc;
         xrSwapchain.xrDesc = *createInfo;
@@ -379,7 +402,8 @@ namespace pimax_openxr {
         // Lazily-filled state.
         for (int i = 1; i < desc.ArraySize; i++) {
             xrSwapchain.pvrSwapchain.push_back(nullptr);
-            xrSwapchain.slices.push_back({});
+            xrSwapchain.d3dSlices.push_back({});
+            xrSwapchain.glSlices.push_back({});
             xrSwapchain.imagesResourceView.push_back({});
         }
 
@@ -411,6 +435,8 @@ namespace pimax_openxr {
             flushD3D12CommandQueue();
         } else if (isVulkanSession()) {
             flushVulkanCommandQueue();
+        } else if (isOpenGLSession()) {
+            flushOpenGLContext();
         } else {
             flushD3D11Context();
         }
@@ -480,6 +506,9 @@ namespace pimax_openxr {
             } else if (isVulkanSession()) {
                 XrSwapchainImageVulkanKHR* vkImages = reinterpret_cast<XrSwapchainImageVulkanKHR*>(images);
                 return getSwapchainImagesVulkan(xrSwapchain, vkImages, *imageCountOutput);
+            } else if (isOpenGLSession()) {
+                XrSwapchainImageOpenGLKHR* glImages = reinterpret_cast<XrSwapchainImageOpenGLKHR*>(images);
+                return getSwapchainImagesOpenGL(xrSwapchain, glImages, *imageCountOutput);
             } else {
                 XrSwapchainImageD3D11KHR* d3d11Images = reinterpret_cast<XrSwapchainImageD3D11KHR*>(images);
                 return getSwapchainImagesD3D11(xrSwapchain, d3d11Images, *imageCountOutput);
@@ -582,6 +611,25 @@ namespace pimax_openxr {
         }
 
         return XR_SUCCESS;
+    }
+
+    void OpenXrRuntime::createSwapchain(const pvrTextureSwapChainDesc* desc, pvrTextureSwapChain* swapchain) const {
+        if (isOpenGLSession()) {
+            GlContextSwitch context(m_glContext);
+
+            CHECK_PVRCMD(pvr_createTextureSwapChainGL(m_pvrSession, desc, swapchain));
+        } else {
+            CHECK_PVRCMD(pvr_createTextureSwapChainDX(m_pvrSession, m_d3d11Device.Get(), desc, swapchain));
+        }
+    }
+
+    void OpenXrRuntime::prepareAndCommitSwapchainImage(
+        Swapchain& xrSwapchain, uint32_t slice, std::set<std::pair<pvrTextureSwapChain, uint32_t>>& committed) const {
+        if (isOpenGLSession()) {
+            prepareAndCommitSwapchainImageOpenGL(xrSwapchain, slice, committed);
+        } else {
+            prepareAndCommitSwapchainImageD3D11(xrSwapchain, slice, committed);
+        }
     }
 
 } // namespace pimax_openxr
