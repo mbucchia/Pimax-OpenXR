@@ -342,7 +342,7 @@ namespace pimax_openxr {
         }
 
         // Latch the state of parallel projection now. This is needed for computing the recommended swapchain sizes as
-        // part of xrGetSystem(). Note: we may reset this later in case the system does not use canted displays.
+        // part of xrGetSystem().
         m_useParallelProjection = !pvr_getIntConfig(m_pvrSession, "steamvr_use_native_fov", 0);
 
         m_instanceCreated = true;

@@ -147,6 +147,20 @@ namespace pimax_openxr {
         TraceLoggingWrite(
             g_traceProvider, "xrEnumerateViewConfigurationViews", TLArg(*viewCountOutput, "ViewCountOutput"));
 
+        // update cached information
+        pvrEyeRenderInfo newEyeInfo[xr::StereoView::Count];
+        if (!pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Left, &newEyeInfo[0])) {
+            bool useParallelProjection = !pvr_getIntConfig(m_pvrSession, "steamvr_use_native_fov", 0);
+            if (m_useParallelProjection != useParallelProjection ||
+                memcmp(&m_cachedEyeInfo[0], &newEyeInfo[0], sizeof(pvrEyeRenderInfo) - 4)) // sans trailing padding
+                if (!pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Right, &newEyeInfo[1])) {
+                    m_useParallelProjection = useParallelProjection;
+                    m_cachedEyeInfo[0] = newEyeInfo[0];
+                    m_cachedEyeInfo[1] = newEyeInfo[1];
+                    updateEyeInfo();
+                }
+        }
+
         if (viewCapacityInput && views) {
             for (uint32_t i = 0; i < *viewCountOutput; i++) {
                 if (views[i].type != XR_TYPE_VIEW_CONFIGURATION_VIEW) {

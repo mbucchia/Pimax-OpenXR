@@ -96,13 +96,6 @@ namespace pimax_openxr {
             m_loggedProductName = true;
         }
 
-        // Pimax 4K is the only device without canted displays.
-        const bool hasCantedDisplays = !(m_cachedHmdInfo.VendorId == 1155 && m_cachedHmdInfo.ProductId == 33);
-        m_useParallelProjection = hasCantedDisplays && m_useParallelProjection;
-        if (m_useParallelProjection) {
-            Log("Parallel projection is enabled\n");
-        }
-
         // Cache common information.
         m_floorHeight = pvr_getFloatConfig(m_pvrSession, CONFIG_KEY_EYE_HEIGHT, 0.f);
         TraceLoggingWrite(g_traceProvider,
@@ -112,27 +105,9 @@ namespace pimax_openxr {
 
         CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Left, &m_cachedEyeInfo[0]));
         CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Right, &m_cachedEyeInfo[1]));
-        for (uint32_t i = 0; i < xr::StereoView::Count; i++) {
-            m_cachedEyeFov[i].angleDown = -atan(m_cachedEyeInfo[i].Fov.DownTan);
-            m_cachedEyeFov[i].angleUp = atan(m_cachedEyeInfo[i].Fov.UpTan);
-            m_cachedEyeFov[i].angleLeft = -atan(m_cachedEyeInfo[i].Fov.LeftTan);
-            m_cachedEyeFov[i].angleRight = atan(m_cachedEyeInfo[i].Fov.RightTan);
-
-            // Apply parallel projection transforms. These are needed in order to calculate the appropriate resolution
-            // to recommend for swapchains.
-            if (m_useParallelProjection) {
-                // Eliminate canting.
-                m_cachedEyeInfo[i].HmdToEyePose.Orientation = PVR::Quatf::Identity();
-
-                // Shift FOV by 10 degrees. All Pimax headsets with canted displays have a 10 degrees canting.
-                const float angle = i == 0 ? -PVR::DegreeToRad(10.f) : PVR::DegreeToRad(10.f);
-                m_cachedEyeFov[i].angleLeft += angle;
-                m_cachedEyeFov[i].angleRight += angle;
-
-                // Per https://risa2000.github.io/hmdgdb, PP also increases the vertical FOV by 6 degrees.
-                m_cachedEyeFov[i].angleUp += PVR::DegreeToRad(6.f);
-                m_cachedEyeFov[i].angleDown -= PVR::DegreeToRad(6.f);
-            }
+        updateEyeInfo();
+        if (m_useParallelProjection && m_cantingAngle) {
+            Log("Parallel projection is enabled\n");
         }
 
         // Setup common parameters.
@@ -263,6 +238,32 @@ namespace pimax_openxr {
         }
 
         return XR_SUCCESS;
+    }
+
+    void OpenXrRuntime::updateEyeInfo() {
+        m_cantingAngle = PVR::Quatf{m_cachedEyeInfo[0].HmdToEyePose.Orientation}.Angle(m_cachedEyeInfo[1].HmdToEyePose.Orientation)/2;
+        for (uint32_t i = 0; i < xr::StereoView::Count; i++) {
+            m_cachedEyeFov[i].angleDown = -atan(m_cachedEyeInfo[i].Fov.DownTan);
+            m_cachedEyeFov[i].angleUp = atan(m_cachedEyeInfo[i].Fov.UpTan);
+            m_cachedEyeFov[i].angleLeft = -atan(m_cachedEyeInfo[i].Fov.LeftTan);
+            m_cachedEyeFov[i].angleRight = atan(m_cachedEyeInfo[i].Fov.RightTan);
+
+            // Apply parallel projection transforms. These are needed in order to calculate the appropriate resolution
+            // to recommend for swapchains.
+            if (m_useParallelProjection && m_cantingAngle) {
+                // Eliminate canting.
+                m_cachedEyeInfo[i].HmdToEyePose.Orientation = PVR::Quatf::Identity();
+
+                // Shift FOV by canting angle
+                const float angle = i == 0 ? -m_cantingAngle : m_cantingAngle;
+                m_cachedEyeFov[i].angleLeft += angle;
+                m_cachedEyeFov[i].angleRight += angle;
+
+                // Per https://risa2000.github.io/hmdgdb, PP also increases the vertical FOV by 6 degrees.
+                m_cachedEyeFov[i].angleUp += PVR::DegreeToRad(6.f);
+                m_cachedEyeFov[i].angleDown -= PVR::DegreeToRad(6.f);
+            }
+        }
     }
 
     // Retrieve some information from PVR needed for graphic/frame management.

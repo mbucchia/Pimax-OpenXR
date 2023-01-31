@@ -361,6 +361,7 @@ namespace pimax_openxr {
         std::optional<int> getSetting(const std::string& value) const;
 
         // system.cpp
+        void updateEyeInfo();
         void fillDisplayDeviceInfo();
 
         // session.cpp
@@ -474,6 +475,7 @@ namespace pimax_openxr {
         double m_frameDuration{0};
         pvrHmdInfo m_cachedHmdInfo{};
         pvrEyeRenderInfo m_cachedEyeInfo[xr::StereoView::Count]{};
+        float m_cantingAngle{0};
         float m_floorHeight{0.f};
         LARGE_INTEGER m_qpcFrequency{};
         double m_pvrTimeFromQpcTimeOffset{0};

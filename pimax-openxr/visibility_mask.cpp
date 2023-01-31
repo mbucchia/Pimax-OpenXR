@@ -72,8 +72,8 @@ namespace pimax_openxr {
         }
 
         // We only support the hidden area mesh and we don't return a mask with parallel projection.
-        if (visibilityMaskType != XR_VISIBILITY_MASK_TYPE_HIDDEN_TRIANGLE_MESH_KHR || m_useParallelProjection) {
-            if (!m_useParallelProjection) {
+        if (visibilityMaskType != XR_VISIBILITY_MASK_TYPE_HIDDEN_TRIANGLE_MESH_KHR || m_useParallelProjection && m_cantingAngle) {
+            if (visibilityMaskType != XR_VISIBILITY_MASK_TYPE_HIDDEN_TRIANGLE_MESH_KHR) {
                 LOG_TELEMETRY_ONCE(logUnimplemented("VisibilityMaskTypeNotSupported"));
             }
 
