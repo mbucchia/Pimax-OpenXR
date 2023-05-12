@@ -60,6 +60,12 @@ namespace pimax_openxr {
                                                       return mapPathToCrystalControllerInputState(
                                                           xrAction, getXrPath(binding), source);
                                                   });
+        m_controllerMappingTable.insert_or_assign(std::make_pair("/interaction_profiles/htc/vive_tracker_htcx",
+                                                                 "/interaction_profiles/htc/vive_tracker_htcx"),
+                                                  [&](const Action& xrAction, XrPath binding, ActionSource& source) {
+                                                      return mapPathToViveTrackerInputState(
+                                                          xrAction, getXrPath(binding), source);
+                                                  });
         m_controllerMappingTable.insert_or_assign(std::make_pair("/interaction_profiles/khr/simple_controller",
                                                                  "/interaction_profiles/khr/simple_controller"),
                                                   [&](const Action& xrAction, XrPath binding, ActionSource& source) {
@@ -244,6 +250,9 @@ namespace pimax_openxr {
         m_controllerValidPathsTable.insert_or_assign(
             "/interaction_profiles/oculus/touch_controller",
             [&](const std::string& path) { return getCrystalControllerLocalizedSourceName(path) != "<Unknown>"; });
+        m_controllerValidPathsTable.insert_or_assign(
+            "/interaction_profiles/htc/vive_tracker_htcx",
+            [&](const std::string& path) { return getViveTrackerLocalizedSourceName(path) != "<Unknown>"; });
         m_controllerValidPathsTable.insert_or_assign(
             "/interaction_profiles/microsoft/motion_controller", [&](const std::string& path) {
                 if (endsWith(path, "/input/menu/click") || endsWith(path, "/input/menu") ||
@@ -553,6 +562,25 @@ namespace pimax_openxr {
         return true;
     }
 
+    bool OpenXrRuntime::mapPathToViveTrackerInputState(const Action& xrAction,
+                                                       const std::string& path,
+                                                       ActionSource& source) const {
+        source.buttonMap = nullptr;
+        source.floatValue = nullptr;
+        source.vector2fValue = nullptr;
+
+        if (endsWith(path, "/input/grip/pose") || endsWith(path, "/output/haptic")) {
+            // Do nothing.
+        } else {
+            // No possible binding. PVR does not seem to handle GPIOs on the trackers.
+            return false;
+        }
+
+        source.realPath = path;
+
+        return true;
+    }
+
     bool OpenXrRuntime::mapPathToSimpleControllerInputState(const Action& xrAction,
                                                             const std::string& path,
                                                             ActionSource& source) const {
@@ -716,6 +744,38 @@ namespace pimax_openxr {
             return "Grip Pose";
         } else if (endsWith(path, "/input/aim/pose")) {
             return "Aim Pose";
+        } else if (endsWith(path, "/output/haptic")) {
+            return "Haptics";
+        }
+
+        return "<Unknown>";
+    }
+
+    std::string OpenXrRuntime::getViveTrackerLocalizedSourceName(const std::string& path) const {
+        if (endsWith(path, "/input/system/click") || endsWith(path, "/input/system")) {
+            return "System Button";
+        } else if (endsWith(path, "/input/squeeze/click") || endsWith(path, "/input/squeeze/force") ||
+                   endsWith(path, "/input/squeeze")) {
+            return "Grip Press";
+        } else if (endsWith(path, "/input/menu/click") || endsWith(path, "/input/menu")) {
+            return "Menu Button";
+        } else if (endsWith(path, "/input/trigger/click")) {
+            return "Trigger Press";
+        } else if (endsWith(path, "/input/trigger/value") || endsWith(path, "/input/trigger")) {
+            return "Trigger";
+        } else if (endsWith(path, "/input/trackpad")) {
+            return "Trackpad";
+        } else if (endsWith(path, "/input/trackpad/x")) {
+            return "Trackpad X axis";
+        } else if (endsWith(path, "/input/trackpad/y")) {
+            return "Trackpad Y axis";
+        } else if (endsWith(path, "/input/trackpad/click") || endsWith(path, "/input/trackpad/force") ||
+                   endsWith(path, "/input/trackpad")) {
+            return "Trackpad Press";
+        } else if (endsWith(path, "/input/trackpad/touch")) {
+            return "Trackpad Touch";
+        } else if (endsWith(path, "/input/grip/pose")) {
+            return "Grip Pose";
         } else if (endsWith(path, "/output/haptic")) {
             return "Haptics";
         }

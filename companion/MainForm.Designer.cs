@@ -72,6 +72,7 @@ namespace companion
             this.restoreDefaults = new System.Windows.Forms.Button();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
+            this.assignTrackers = new System.Windows.Forms.Button();
             this.tableLayoutPanel1.SuspendLayout();
             this.flowLayoutPanel1.SuspendLayout();
             this.flowLayoutPanel3.SuspendLayout();
@@ -264,6 +265,7 @@ namespace companion
             this.flowLayoutPanel4.Controls.Add(this.telemetryLabel);
             this.flowLayoutPanel4.Controls.Add(this.enableTelemetry);
             this.flowLayoutPanel4.Controls.Add(this.restoreDefaults);
+            this.flowLayoutPanel4.Controls.Add(this.assignTrackers);
             this.flowLayoutPanel4.Dock = System.Windows.Forms.DockStyle.Fill;
             this.flowLayoutPanel4.Location = new System.Drawing.Point(2, 149);
             this.flowLayoutPanel4.Margin = new System.Windows.Forms.Padding(2);
@@ -575,10 +577,10 @@ namespace companion
             // 
             // restoreDefaults
             // 
-            this.restoreDefaults.Location = new System.Drawing.Point(6, 546);
-            this.restoreDefaults.Margin = new System.Windows.Forms.Padding(6, 0, 3, 0);
+            this.restoreDefaults.Location = new System.Drawing.Point(2, 549);
+            this.restoreDefaults.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.restoreDefaults.Name = "restoreDefaults";
-            this.restoreDefaults.Size = new System.Drawing.Size(126, 39);
+            this.restoreDefaults.Size = new System.Drawing.Size(130, 42);
             this.restoreDefaults.TabIndex = 28;
             this.restoreDefaults.Text = "Restore defaults";
             this.restoreDefaults.UseVisualStyleBackColor = true;
@@ -595,6 +597,17 @@ namespace companion
             this.pictureBox1.TabIndex = 0;
             this.pictureBox1.TabStop = false;
             this.pictureBox1.DoubleClick += new System.EventHandler(this.pictureBox1_DoubleClick);
+            // 
+            // assignTrackers
+            // 
+            this.assignTrackers.Location = new System.Drawing.Point(137, 549);
+            this.assignTrackers.Margin = new System.Windows.Forms.Padding(3, 0, 3, 3);
+            this.assignTrackers.Name = "assignTrackers";
+            this.assignTrackers.Size = new System.Drawing.Size(262, 42);
+            this.assignTrackers.TabIndex = 29;
+            this.assignTrackers.Text = "Open Tracker Assignment settings";
+            this.assignTrackers.UseVisualStyleBackColor = true;
+            this.assignTrackers.Click += new System.EventHandler(this.assignTrackers_Click);
             // 
             // MainForm
             // 
@@ -667,6 +680,7 @@ namespace companion
         private System.Windows.Forms.CheckBox enableUltraleap;
         private System.Windows.Forms.LinkLabel downloadUltraleap;
         private System.Windows.Forms.ToolTip toolTip;
+        private System.Windows.Forms.Button assignTrackers;
     }
 }
 

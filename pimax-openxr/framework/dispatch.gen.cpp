@@ -1550,6 +1550,27 @@ namespace RUNTIME_NAMESPACE {
 		return result;
 	}
 
+	XrResult XRAPI_CALL xrEnumerateViveTrackerPathsHTCX(XrInstance instance, uint32_t pathCapacityInput, uint32_t* pathCountOutput, XrViveTrackerPathsHTCX* paths) {
+		TraceLocalActivity(local);
+		TraceLoggingWriteStart(local, "xrEnumerateViveTrackerPathsHTCX");
+
+		XrResult result;
+		try {
+			result = RUNTIME_NAMESPACE::GetInstance()->xrEnumerateViveTrackerPathsHTCX(instance, pathCapacityInput, pathCountOutput, paths);
+		} catch (std::exception& exc) {
+			TraceLoggingWriteTagged(local, "xrEnumerateViveTrackerPathsHTCX_Error", TLArg(exc.what(), "Error"));
+			ErrorLog("xrEnumerateViveTrackerPathsHTCX: %s\n", exc.what());
+			result = XR_ERROR_RUNTIME_FAILURE;
+		}
+
+		TraceLoggingWriteStop(local, "xrEnumerateViveTrackerPathsHTCX", TLArg(xr::ToCString(result), "Result"));
+		if (XR_FAILED(result)) {
+			ErrorLog("xrEnumerateViveTrackerPathsHTCX failed with %s\n", xr::ToCString(result));
+		}
+
+		return result;
+	}
+
 
 	// Auto-generated dispatcher handler.
 	XrResult OpenXrApi::xrGetInstanceProcAddr(XrInstance instance, const char* name, PFN_xrVoidFunction* function) {
@@ -1777,6 +1798,9 @@ namespace RUNTIME_NAMESPACE {
 		else if (has_XR_FB_display_refresh_rate && apiName == "xrRequestDisplayRefreshRateFB") {
 			*function = reinterpret_cast<PFN_xrVoidFunction>(RUNTIME_NAMESPACE::xrRequestDisplayRefreshRateFB);
 		}
+		else if (has_XR_HTCX_vive_tracker_interaction && apiName == "xrEnumerateViveTrackerPathsHTCX") {
+			*function = reinterpret_cast<PFN_xrVoidFunction>(RUNTIME_NAMESPACE::xrEnumerateViveTrackerPathsHTCX);
+		}
 		else {
 			return XR_ERROR_FUNCTION_UNSUPPORTED;
 		}
@@ -1829,6 +1853,9 @@ namespace RUNTIME_NAMESPACE {
 		}
 		else if (extensionName == "XR_VARJO_foveated_rendering") {
 			has_XR_VARJO_foveated_rendering = true;
+		}
+		else if (extensionName == "XR_HTCX_vive_tracker_interaction") {
+			has_XR_HTCX_vive_tracker_interaction = true;
 		}
 
 	}

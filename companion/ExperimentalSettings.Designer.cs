@@ -531,9 +531,9 @@ namespace companion
             this.noRestartLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.noRestartLabel.Name = "noRestartLabel";
             this.noRestartLabel.Padding = new System.Windows.Forms.Padding(3, 3, 0, 0);
-            this.noRestartLabel.Size = new System.Drawing.Size(204, 16);
+            this.noRestartLabel.Size = new System.Drawing.Size(312, 16);
             this.noRestartLabel.TabIndex = 35;
-            this.noRestartLabel.Text = "(*): Settings taking effect without a restart";
+            this.noRestartLabel.Text = "(*): Settings taking effect without restarting the game/application";
             // 
             // restoreDefaults
             // 

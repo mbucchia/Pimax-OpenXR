@@ -559,6 +559,13 @@ namespace companion
             WriteSetting("mirror_window", mirrorMode.Checked ? 1 : 0);
         }
 
+        private TrackerAssignment trackerAssignment = new TrackerAssignment();
+        private void assignTrackers_Click(object sender, EventArgs e)
+        {
+            trackerAssignment.Show();
+            trackerAssignment.LoadSettings();
+        }
+
         private void enableTelemetry_CheckedChanged(object sender, EventArgs e)
         {
             if (loading)

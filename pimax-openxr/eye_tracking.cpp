@@ -34,6 +34,10 @@ namespace pimax_openxr {
     using namespace pimax_openxr::utils;
     using namespace xr::math;
 
+    bool OpenXrRuntime::isActionEyeTracker(const std::string& fullPath) const {
+        return fullPath == "/user/eyes_ext/input/gaze_ext/pose";
+    }
+
     bool OpenXrRuntime::getEyeGaze(XrTime time, bool getStateOnly, XrVector3f& unitVector, double& sampleTime) const {
         if (m_eyeTrackingType == EyeTracking::PVR) {
             pvrEyeTrackingInfo state{};

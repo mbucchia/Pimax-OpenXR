@@ -241,6 +241,10 @@ namespace pimax_openxr {
                                                   float* displayRefreshRates) override;
         XrResult xrGetDisplayRefreshRateFB(XrSession session, float* displayRefreshRate) override;
         XrResult xrRequestDisplayRefreshRateFB(XrSession session, float displayRefreshRate) override;
+        XrResult xrEnumerateViveTrackerPathsHTCX(XrInstance instance,
+                                                 uint32_t pathCapacityInput,
+                                                 uint32_t* pathCountOutput,
+                                                 XrViveTrackerPathsHTCX* paths) override;
 
       private:
         enum class ForcedInteractionProfile {
@@ -332,14 +336,14 @@ namespace pimax_openxr {
 
             XrActionSet actionSet{XR_NULL_HANDLE};
 
-            float lastFloatValue[2]{0.f, 0.f};
-            XrTime lastFloatValueChangedTime[2]{0, 0};
+            float lastFloatValue[xr::Side::Count]{0.f, 0.f};
+            XrTime lastFloatValueChangedTime[xr::Side::Count]{0, 0};
 
-            XrVector2f lastVector2fValue[2]{{0.f, 0.f}, {0.f, 0.f}};
-            XrTime lastVector2fValueChangedTime[2]{0, 0};
+            XrVector2f lastVector2fValue[xr::Side::Count]{{0.f, 0.f}, {0.f, 0.f}};
+            XrTime lastVector2fValueChangedTime[xr::Side::Count]{0, 0};
 
-            bool lastBoolValue[2]{false, false};
-            XrTime lastBoolValueChangedTime[2]{0, 0};
+            bool lastBoolValue[xr::Side::Count]{false, false};
+            XrTime lastBoolValueChangedTime[xr::Side::Count]{0, 0};
 
             std::set<XrPath> subactionPaths;
             std::map<std::string, ActionSource> actionSources;
@@ -370,9 +374,9 @@ namespace pimax_openxr {
 
         // action.cpp
         void rebindControllerActions(int side);
+        void rebindTrackerActions(const std::string& serial, bool connected);
         std::string getXrPath(XrPath path) const;
         int getActionSide(const std::string& fullPath, bool allowExtraPaths = false) const;
-        bool isActionEyeTracker(const std::string& fullPath) const;
         XrVector2f handleJoystickDeadzone(pvrVector2f raw) const;
         void handleBuiltinActions(bool wasRecenteringPressed = false);
 
@@ -387,12 +391,16 @@ namespace pimax_openxr {
         bool mapPathToCrystalControllerInputState(const Action& xrAction,
                                                   const std::string& path,
                                                   ActionSource& source) const;
+        bool mapPathToViveTrackerInputState(const Action& xrAction,
+                                            const std::string& path,
+                                            ActionSource& source) const;
         bool mapPathToSimpleControllerInputState(const Action& xrAction,
                                                  const std::string& path,
                                                  ActionSource& source) const;
         std::string getViveControllerLocalizedSourceName(const std::string& path) const;
         std::string getIndexControllerLocalizedSourceName(const std::string& path) const;
         std::string getCrystalControllerLocalizedSourceName(const std::string& path) const;
+        std::string getViveTrackerLocalizedSourceName(const std::string& path) const;
         std::string getSimpleControllerLocalizedSourceName(const std::string& path) const;
         std::optional<std::string> remapSimpleControllerToViveController(const std::string& path) const;
         std::optional<std::string> remapOculusTouchControllerToViveController(const std::string& path) const;
@@ -418,10 +426,12 @@ namespace pimax_openxr {
                                                  XrSpaceVelocity* velocity,
                                                  XrEyeGazeSampleTimeEXT* gazeSampleTime) const;
         XrSpaceLocationFlags getHmdPose(XrTime time, XrPosef& pose, XrSpaceVelocity* velocity) const;
-        XrSpaceLocationFlags getControllerPose(int side, XrTime time, XrPosef& pose, XrSpaceVelocity* velocity) const;
+        XrSpaceLocationFlags
+        getDevicePose(int deviceIndex, XrTime time, XrPosef& pose, XrSpaceVelocity* velocity) const;
         XrSpaceLocationFlags getEyeTrackerPose(XrTime time, XrPosef& pose, XrEyeGazeSampleTimeEXT* sampleTime) const;
 
         // eye_tracking.cpp
+        bool isActionEyeTracker(const std::string& fullPath) const;
         bool getEyeGaze(XrTime time, bool getStateOnly, XrVector3f& unitVector, double& sampleTime) const;
 #ifndef NOASEEVRCLIENT
         bool initializeDroolon();
@@ -492,6 +502,11 @@ namespace pimax_openxr {
         LRESULT CALLBACK mirrorWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
         friend LRESULT CALLBACK wndProcWrapper(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+        // vive_tracker.cpp
+        void initializeTrackerRoleTable();
+        int getTrackerIndex(const std::string& path) const;
+        std::string getTrackerRolePath(const std::string& serial) const;
+
         // Instance & PVR state.
         pvrEnvHandle m_pvr{nullptr};
         pvrSessionHandle m_pvrSession{nullptr};
@@ -535,12 +550,16 @@ namespace pimax_openxr {
 #endif
         float m_droolonProjectionDistance{0.35f};
         bool m_isEyeTrackingAvailable{false};
+        bool m_hasEyeTrackerBindings{false};
         float m_focusPixelDensity{1.f};
         float m_peripheralPixelDensity{0.5f};
         // [0] = non-foveated, [1] = foveated
         float m_horizontalFovSection[2]{0.75f, 0.5f};
         float m_verticalFovSection[2]{0.7f, 0.5f};
         bool m_preferFoveatedRendering{true};
+        std::map<std::string, std::string> m_trackersSerialToRole;
+        std::map<std::string, std::string> m_trackersRoleToSerial;
+        bool m_hasViveTrackerBindings{false};
 
         // Session state.
         ComPtr<ID3D11Device5> m_pvrSubmissionDevice;
@@ -572,17 +591,20 @@ namespace pimax_openxr {
         bool m_swapGripAimPoses{false};
         std::set<XrActionSet> m_activeActionSets;
         std::map<std::string, std::vector<XrActionSuggestedBinding>> m_suggestedBindings;
-        bool m_isControllerActive[2]{false, false};
-        std::string m_cachedControllerType[2];
+        bool m_isControllerActive[xr::Side::Count]{false, false};
+        std::string m_cachedControllerType[xr::Side::Count];
         XrPosef m_controllerAimOffset;
         XrPosef m_controllerGripOffset;
         XrPosef m_controllerHandOffset;
-        XrPosef m_controllerAimPose[2];
-        XrPosef m_controllerGripPose[2];
-        XrPosef m_controllerHandPose[2];
-        std::string m_localizedControllerType[2];
-        XrPath m_currentInteractionProfile[2]{XR_NULL_PATH, XR_NULL_PATH};
+        XrPosef m_controllerAimPose[xr::Side::Count];
+        XrPosef m_controllerGripPose[xr::Side::Count];
+        XrPosef m_controllerHandPose[xr::Side::Count];
+        std::string m_localizedControllerType[xr::Side::Count];
+        XrPath m_currentInteractionProfile[xr::Side::Count]{XR_NULL_PATH, XR_NULL_PATH};
         bool m_currentInteractionProfileDirty{false};
+        mutable std::mutex m_trackersLock;
+        std::map<std::string, uint32_t> m_trackers;
+        std::deque<std::string> m_trackersNotifications;
         std::optional<ForcedInteractionProfile> m_forcedInteractionProfile;
         std::optional<ForcedInteractionProfile> m_lastForcedInteractionProfile;
         std::string m_debugControllerType;
@@ -641,8 +663,8 @@ namespace pimax_openxr {
         GLuint m_glSemaphore{0};
         UINT64 m_fenceValue{0};
 
-        // Due to Vulkan semaphore transference rules(?) it looks like we may not be able to both signal and wait on an
-        // imported semaphore. Use a separate one for host-side flushes.
+        // Due to Vulkan semaphore transference rules(?) it looks like we may not be able to both signal and wait on
+        // an imported semaphore. Use a separate one for host-side flushes.
         VkSemaphore m_vkTimelineSemaphoreForFlush{VK_NULL_HANDLE};
 
         // Workaround: the AMD driver does not seem to like closing the handle for the shared fence when using

@@ -158,18 +158,18 @@ namespace pimax_openxr {
         XrPosef baseSpaceToVirtual = Pose::Identity();
         XrPosef basePose = Pose::Identity();
         const auto flags1 = locateSpaceToOrigin(xrBaseSpace, locateInfo->time, baseSpaceToVirtual, nullptr, nullptr);
-        const auto flags2 = getControllerPose(xrHandTracker.side, locateInfo->time, basePose, nullptr);
+        const auto flags2 = getDevicePose(xrHandTracker.side, locateInfo->time, basePose, nullptr);
 
         pvrSkeletalData skeletalData{};
         const auto result = pvr_getSkeletalData(m_pvrSession,
-                                                xrHandTracker.side == 0 ? pvrTrackedDevice_LeftController
-                                                                        : pvrTrackedDevice_RightController,
+                                                xrHandTracker.side == xr::Side::Left ? pvrTrackedDevice_LeftController
+                                                                                     : pvrTrackedDevice_RightController,
                                                 range,
                                                 &skeletalData);
         if (result == pvr_not_support || skeletalData.boneCount == 0) {
             TraceLoggingWrite(g_traceProvider,
                               "PVR_SkeletalData",
-                              TLArg(xrHandTracker.side == 0 ? "Left" : "Right", "Side"),
+                              TLArg(xrHandTracker.side == xr::Side::Left ? "Left" : "Right", "Side"),
                               TLArg(xr::ToString(result).c_str(), "Result"),
                               TLArg(skeletalData.boneCount, "Count"));
 
@@ -184,7 +184,7 @@ namespace pimax_openxr {
             TraceLoggingWrite(
                 g_traceProvider,
                 "PVR_SkeletalData",
-                TLArg(xrHandTracker.side == 0 ? "Left" : "Right", "Side"),
+                TLArg(xrHandTracker.side == xr::Side::Left ? "Left" : "Right", "Side"),
                 TLArg(skeletalData.boneCount, "Count"),
                 TLArg(xr::ToString(skeletalData.boneTransforms[0]).c_str(), "Root"),
                 TLArg(xr::ToString(skeletalData.boneTransforms[XR_HAND_JOINT_WRIST_EXT]).c_str(), "Wrist"),

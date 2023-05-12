@@ -114,6 +114,7 @@ namespace RUNTIME_NAMESPACE {
 		virtual XrResult xrEnumerateDisplayRefreshRatesFB(XrSession session, uint32_t displayRefreshRateCapacityInput, uint32_t* displayRefreshRateCountOutput, float* displayRefreshRates) = 0;
 		virtual XrResult xrGetDisplayRefreshRateFB(XrSession session, float* displayRefreshRate) = 0;
 		virtual XrResult xrRequestDisplayRefreshRateFB(XrSession session, float displayRefreshRate) = 0;
+		virtual XrResult xrEnumerateViveTrackerPathsHTCX(XrInstance instance, uint32_t pathCapacityInput, uint32_t* pathCountOutput, XrViveTrackerPathsHTCX* paths) = 0;
 
 
 	protected:
@@ -135,6 +136,7 @@ namespace RUNTIME_NAMESPACE {
 		bool has_XR_EXT_eye_gaze_interaction{false};
 		bool has_XR_VARJO_quad_views{false};
 		bool has_XR_VARJO_foveated_rendering{false};
+		bool has_XR_HTCX_vive_tracker_interaction{false};
 
 
 	};

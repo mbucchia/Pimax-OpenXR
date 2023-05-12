@@ -286,6 +286,7 @@ namespace pimax_openxr {
 
         initializeExtensionsTable();
         initializeRemappingTables();
+        initializeTrackerRoleTable();
     }
 
     OpenXrRuntime::~OpenXrRuntime() {
@@ -514,6 +515,33 @@ namespace pimax_openxr {
             return XR_SUCCESS;
         }
 
+        if (!m_trackersNotifications.empty()) {
+            const auto trackerSerial = m_trackersNotifications.front();
+            m_trackersNotifications.pop_front();
+
+            XrEventDataViveTrackerConnectedHTCX* const buffer =
+                reinterpret_cast<XrEventDataViveTrackerConnectedHTCX*>(eventData);
+            buffer->type = XR_TYPE_EVENT_DATA_VIVE_TRACKER_CONNECTED_HTCX;
+            buffer->next = nullptr;
+            buffer->paths = reinterpret_cast<XrViveTrackerPathsHTCX*>(buffer + 1);
+            buffer->paths->type = XR_TYPE_VIVE_TRACKER_PATHS_HTCX;
+
+            const std::string persistentPath = "/user/vive_tracker_htcx/serial/" + trackerSerial;
+            const std::string rolePath = getTrackerRolePath(trackerSerial);
+            CHECK_XRCMD(xrStringToPath(XR_NULL_HANDLE, persistentPath.c_str(), &buffer->paths->persistentPath));
+            if (!rolePath.empty()) {
+                CHECK_XRCMD(xrStringToPath(XR_NULL_HANDLE, rolePath.c_str(), &buffer->paths->rolePath));
+            } else {
+                buffer->paths->rolePath = XR_NULL_PATH;
+            }
+
+            TraceLoggingWrite(g_traceProvider,
+                              "xrPollEvent",
+                              TLArg("ViveTrackerConnectedHTCX", "Type"),
+                              TLArg(buffer->paths->persistentPath, "PersistentPath"),
+                              TLArg(buffer->paths->rolePath, "RolePath"));
+        }
+
         return XR_EVENT_UNAVAILABLE;
     }
 
@@ -602,6 +630,9 @@ namespace pimax_openxr {
             m_extensionsTable.push_back( // Foveated rendering with quad views.
                 {XR_VARJO_FOVEATED_RENDERING_EXTENSION_NAME, XR_VARJO_foveated_rendering_SPEC_VERSION});
         }
+
+        m_extensionsTable.push_back( // Vive tracker.
+            {XR_HTCX_VIVE_TRACKER_INTERACTION_EXTENSION_NAME, XR_HTCX_vive_tracker_interaction_SPEC_VERSION});
 
         // FIXME: Add new extensions here.
     }

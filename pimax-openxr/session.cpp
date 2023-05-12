@@ -171,11 +171,12 @@ namespace pimax_openxr {
 
         m_frameTimes.clear();
 
-        m_isControllerActive[0] = m_isControllerActive[1] = false;
-        m_controllerAimPose[0] = m_controllerGripPose[0] = m_controllerHandPose[0] = m_controllerAimPose[1] =
-            m_controllerGripPose[1] = m_controllerHandPose[1] = Pose::Identity();
-        rebindControllerActions(0);
-        rebindControllerActions(1);
+        m_isControllerActive[xr::Side::Left] = m_isControllerActive[xr::Side::Right] = false;
+        m_controllerAimPose[xr::Side::Left] = m_controllerGripPose[xr::Side::Left] =
+            m_controllerHandPose[xr::Side::Left] = m_controllerAimPose[xr::Side::Right] =
+                m_controllerGripPose[xr::Side::Right] = m_controllerHandPose[xr::Side::Right] = Pose::Identity();
+        rebindControllerActions(xr::Side::Left);
+        rebindControllerActions(xr::Side::Right);
         m_activeActionSets.clear();
 
         m_sessionStartTime = pvr_getTimeSeconds(m_pvr);
@@ -470,8 +471,8 @@ namespace pimax_openxr {
         if (!Pose::Equals(oldControllerAimOffset, m_controllerAimOffset) ||
             !Pose::Equals(oldControllerGripOffset, m_controllerGripOffset) ||
             !Pose::Equals(oldControllerHandOffset, m_controllerHandOffset)) {
-            m_cachedControllerType[0].clear();
-            m_cachedControllerType[1].clear();
+            m_cachedControllerType[xr::Side::Left].clear();
+            m_cachedControllerType[xr::Side::Right].clear();
         }
 
         // Value is already in microseconds.

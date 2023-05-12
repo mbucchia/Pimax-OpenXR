@@ -520,12 +520,25 @@ namespace pimax_openxr {
                 const std::string& fullPath = source.first;
                 TraceLoggingWrite(g_traceProvider, "xrLocateSpace", TLArg(fullPath.c_str(), "ActionSourcePath"));
 
-                if (!isActionEyeTracker(fullPath)) {
+                const bool isEyeTracker = isActionEyeTracker(fullPath);
+                const int trackerIndex = getTrackerIndex(fullPath);
+
+                if (isEyeTracker) {
+                    result = getEyeTrackerPose(time, pose, gazeSampleTime);
+
+                    // Per spec we must consistently pick one source. We pick the first one.
+                    break;
+                } else if (trackerIndex >= 0) {
+                    result = getDevicePose(xr::Side::Count + trackerIndex, time, pose, velocity);
+
+                    // Per spec we must consistently pick one source. We pick the first one.
+                    break;
+                } else {
                     const bool isGripPose = endsWith(fullPath, "/input/grip/pose");
                     const bool isAimPose = endsWith(fullPath, "/input/aim/pose");
                     const int side = getActionSide(fullPath);
                     if ((isGripPose || isAimPose) && side >= 0) {
-                        result = getControllerPose(side, time, pose, velocity);
+                        result = getDevicePose(side, time, pose, velocity);
 
                         // Apply the pose offsets.
                         const bool useAimPose = m_swapGripAimPoses ? isGripPose : isAimPose;
@@ -538,11 +551,6 @@ namespace pimax_openxr {
                         // Per spec we must consistently pick one source. We pick the first one.
                         break;
                     }
-                } else {
-                    result = getEyeTrackerPose(time, pose, gazeSampleTime);
-
-                    // Per spec we must consistently pick one source. We pick the first one.
-                    break;
                 }
             }
         }
@@ -594,17 +602,34 @@ namespace pimax_openxr {
     }
 
     XrSpaceLocationFlags
-    OpenXrRuntime::getControllerPose(int side, XrTime time, XrPosef& pose, XrSpaceVelocity* velocity) const {
+    OpenXrRuntime::getDevicePose(int deviceIndex, XrTime time, XrPosef& pose, XrSpaceVelocity* velocity) const {
+        constexpr pvrTrackedDeviceType device[] = {pvrTrackedDevice_LeftController,
+                                                   pvrTrackedDevice_RightController,
+                                                   pvrTrackedDevice_Tracker0,
+                                                   pvrTrackedDevice_Tracker1,
+                                                   pvrTrackedDevice_Tracker2,
+                                                   pvrTrackedDevice_Tracker3,
+                                                   pvrTrackedDevice_Tracker4,
+                                                   pvrTrackedDevice_Tracker5,
+                                                   pvrTrackedDevice_Tracker6,
+                                                   pvrTrackedDevice_Tracker7,
+                                                   pvrTrackedDevice_Tracker8,
+                                                   pvrTrackedDevice_Tracker9,
+                                                   pvrTrackedDevice_Tracker10,
+                                                   pvrTrackedDevice_Tracker11,
+                                                   pvrTrackedDevice_Tracker12};
+
         XrSpaceLocationFlags locationFlags = 0;
         pvrPoseStatef state{};
-        CHECK_PVRCMD(pvr_getTrackedDevicePoseState(m_pvrSession,
-                                                   side == 0 ? pvrTrackedDevice_LeftController
-                                                             : pvrTrackedDevice_RightController,
-                                                   xrTimeToPvrTime(time),
-                                                   &state));
+        CHECK_PVRCMD(pvr_getTrackedDevicePoseState(m_pvrSession, device[deviceIndex], xrTimeToPvrTime(time), &state));
         TraceLoggingWrite(g_traceProvider,
-                          "PVR_ControllerPoseState",
-                          TLArg(side == 0 ? "Left" : "Right", "Side"),
+                          "PVR_DevicePoseState",
+                          TLArg(deviceIndex == xr::Side::Left
+                                    ? "Left"
+                                    : (deviceIndex == xr::Side::Right
+                                           ? "Right"
+                                           : fmt::format("Tracker{}", deviceIndex - xr::Side::Count).c_str()),
+                                "Side"),
                           TLArg(state.StatusFlags, "StatusFlags"),
                           TLArg(xr::ToString(state.ThePose).c_str(), "Pose"),
                           TLArg(xr::ToString(state.AngularVelocity).c_str(), "AngularVelocity"),

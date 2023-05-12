@@ -357,25 +357,9 @@ namespace pimax_openxr {
         }
 
         const std::string& interactionProfile = getXrPath(suggestedBindings->interactionProfile);
-        if (interactionProfile != "/interaction_profiles/ext/eye_gaze_interaction") {
-            // Set up to use the controller mappings when a controller is rebinding.
-            const auto checkValidPathIt = m_controllerValidPathsTable.find(interactionProfile);
-            if (checkValidPathIt == m_controllerValidPathsTable.cend()) {
-                return XR_ERROR_PATH_UNSUPPORTED;
-            }
-
-            std::vector<XrActionSuggestedBinding> bindings;
-            for (uint32_t i = 0; i < suggestedBindings->countSuggestedBindings; i++) {
-                const std::string& path = getXrPath(suggestedBindings->suggestedBindings[i].binding);
-                if (getActionSide(path, true) < 0 || !checkValidPathIt->second(path)) {
-                    return XR_ERROR_PATH_UNSUPPORTED;
-                }
-
-                bindings.push_back(suggestedBindings->suggestedBindings[i]);
-            }
-
-            m_suggestedBindings.insert_or_assign(getXrPath(suggestedBindings->interactionProfile), bindings);
-        } else {
+        const bool isEyeTracker = interactionProfile == "/interaction_profiles/ext/eye_gaze_interaction";
+        const bool isViveTracker = interactionProfile == "/interaction_profiles/htc/vive_tracker_htcx";
+        if (isEyeTracker) {
             // Only allow this if the extension is enabled.
             if (!has_XR_EXT_eye_gaze_interaction) {
                 return XR_ERROR_PATH_UNSUPPORTED;
@@ -396,6 +380,41 @@ namespace pimax_openxr {
                 source.realPath = path;
                 xrAction.actionSources.insert_or_assign(path, source);
             }
+
+            m_hasEyeTrackerBindings = true;
+            m_currentInteractionProfileDirty = true;
+        } else if (isViveTracker) {
+            // Only allow this if the extension is enabled.
+            if (!has_XR_HTCX_vive_tracker_interaction) {
+                return XR_ERROR_PATH_UNSUPPORTED;
+            }
+
+            LOG_TELEMETRY_ONCE(logFeature("ViveTrackerInteraction"));
+        }
+
+        if (!isEyeTracker) {
+            // Set up to use the controller mappings when a controller/tracker is rebinding.
+            const auto checkValidPathIt = m_controllerValidPathsTable.find(interactionProfile);
+            if (checkValidPathIt == m_controllerValidPathsTable.cend()) {
+                return XR_ERROR_PATH_UNSUPPORTED;
+            }
+
+            std::vector<XrActionSuggestedBinding> bindings;
+            for (uint32_t i = 0; i < suggestedBindings->countSuggestedBindings; i++) {
+                const std::string& path = getXrPath(suggestedBindings->suggestedBindings[i].binding);
+                if (getActionSide(path, true) < 0 || !checkValidPathIt->second(path)) {
+                    return XR_ERROR_PATH_UNSUPPORTED;
+                }
+
+                bindings.push_back(suggestedBindings->suggestedBindings[i]);
+            }
+
+            m_suggestedBindings.insert_or_assign(getXrPath(suggestedBindings->interactionProfile), bindings);
+        }
+
+        if (isViveTracker) {
+            m_hasViveTrackerBindings = true;
+            m_currentInteractionProfileDirty = true;
         }
 
         return XR_SUCCESS;
@@ -478,9 +497,17 @@ namespace pimax_openxr {
         if (topLevelPath == "/user/hand/left" || topLevelPath == "/user/hand/right") {
             interactionProfile->interactionProfile = m_currentInteractionProfile[getActionSide(topLevelPath)];
         } else if (topLevelPath == "/user/eyes_ext") {
-            CHECK_XRCMD(xrStringToPath(XR_NULL_HANDLE,
-                                       "/interaction_profiles/ext/eye_gaze_interaction",
-                                       &interactionProfile->interactionProfile));
+            if (m_hasEyeTrackerBindings) {
+                CHECK_XRCMD(xrStringToPath(XR_NULL_HANDLE,
+                                           "/interaction_profiles/ext/eye_gaze_interaction",
+                                           &interactionProfile->interactionProfile));
+            }
+        } else if (topLevelPath == "/user/vive_tracker_htcx") {
+            if (m_hasViveTrackerBindings) {
+                CHECK_XRCMD(xrStringToPath(XR_NULL_HANDLE,
+                                           "/interaction_profiles/htc/vive_tracker_htcx",
+                                           &interactionProfile->interactionProfile));
+            }
         } else if (topLevelPath == "/user/head" || topLevelPath == "/user/gamepad") {
         } else {
             return XR_ERROR_PATH_UNSUPPORTED;
@@ -863,6 +890,11 @@ namespace pimax_openxr {
 
                     // Per spec we must consistently pick one source. We pick the first one.
                     break;
+                } else if (getTrackerIndex(fullPath) >= 0) {
+                    state->isActive = XR_TRUE;
+
+                    // Per spec we must consistently pick one source. We pick the first one.
+                    break;
                 }
             } else {
                 state->isActive = m_isEyeTrackingAvailable ? XR_TRUE : XR_FALSE;
@@ -895,14 +927,14 @@ namespace pimax_openxr {
             return XR_ERROR_HANDLE_INVALID;
         }
 
-        bool doSide[2] = {false, false};
+        bool doSide[xr::Side::Count] = {false, false};
         for (uint32_t i = 0; i < syncInfo->countActiveActionSets; i++) {
             if (!m_activeActionSets.count(syncInfo->activeActionSets[i].actionSet)) {
                 return XR_ERROR_ACTIONSET_NOT_ATTACHED;
             }
 
             if (syncInfo->activeActionSets[i].subactionPath == XR_NULL_PATH) {
-                doSide[0] = doSide[1] = true;
+                doSide[xr::Side::Left] = doSide[xr::Side::Right] = true;
             } else {
                 const ActionSet& xrActionSet = *(ActionSet*)syncInfo->activeActionSets[i].actionSet;
 
@@ -911,7 +943,7 @@ namespace pimax_openxr {
                 }
 
                 const int side = getActionSide(getXrPath(syncInfo->activeActionSets[i].subactionPath));
-                if (side >= 0) {
+                if (side == xr::Side::Left || side == xr::Side::Right) {
                     doSide[side] = true;
                 }
             }
@@ -924,7 +956,7 @@ namespace pimax_openxr {
         // Latch the state of all inputs, and we will let the further calls to xrGetActionState*() do the triage.
         CHECK_PVRCMD(pvr_getInputState(m_pvrSession, &m_cachedInputState));
         bool wasRecenteringPressed = false;
-        for (uint32_t side = 0; side < 2; side++) {
+        for (uint32_t side = 0; side < xr::Side::Count; side++) {
             if (!doSide[side]) {
                 continue;
             }
@@ -932,7 +964,7 @@ namespace pimax_openxr {
             TraceLoggingWrite(
                 g_traceProvider,
                 "PVR_InputState",
-                TLArg(side == 0 ? "Left" : "Right", "Side"),
+                TLArg(side == xr::Side::Left ? "Left" : "Right", "Side"),
                 TLArg(m_cachedInputState.TimeInSeconds, "TimeInSeconds"),
                 TLArg(m_cachedInputState.HandButtons[side], "ButtonPress"),
                 TLArg(m_cachedInputState.HandTouches[side], "ButtonTouches"),
@@ -960,19 +992,19 @@ namespace pimax_openxr {
 
             // Look for changes in controller/interaction profiles.
             const auto lastControllerType = m_cachedControllerType[side];
-            const int size = pvr_getTrackedDeviceStringProperty(m_pvrSession,
-                                                                side == 0 ? pvrTrackedDevice_LeftController
-                                                                          : pvrTrackedDevice_RightController,
-                                                                pvrTrackedDeviceProp_ControllerType_String,
-                                                                nullptr,
-                                                                0);
+            const int size = pvr_getTrackedDeviceStringProperty(
+                m_pvrSession,
+                side == xr::Side::Left ? pvrTrackedDevice_LeftController : pvrTrackedDevice_RightController,
+                pvrTrackedDeviceProp_ControllerType_String,
+                nullptr,
+                0);
             m_isControllerActive[side] = size > 0;
             if (m_isControllerActive[side]) {
                 if (m_debugControllerType.empty()) {
                     m_cachedControllerType[side].resize(size, 0);
                     pvr_getTrackedDeviceStringProperty(m_pvrSession,
-                                                       side == 0 ? pvrTrackedDevice_LeftController
-                                                                 : pvrTrackedDevice_RightController,
+                                                       side == xr::Side::Left ? pvrTrackedDevice_LeftController
+                                                                              : pvrTrackedDevice_RightController,
                                                        pvrTrackedDeviceProp_ControllerType_String,
                                                        m_cachedControllerType[side].data(),
                                                        (int)m_cachedControllerType[side].size() + 1);
@@ -990,11 +1022,11 @@ namespace pimax_openxr {
                 if (!m_cachedControllerType[side].empty()) {
                     Log("Detected controller: %s (%s)\n",
                         m_cachedControllerType[side].c_str(),
-                        side == 0 ? "Left" : "Right");
+                        side == xr::Side::Left ? "Left" : "Right");
                 }
                 TraceLoggingWrite(g_traceProvider,
                                   "PVR_ControllerType",
-                                  TLArg(side == 0 ? "Left" : "Right", "Side"),
+                                  TLArg(side == xr::Side::Left ? "Left" : "Right", "Side"),
                                   TLArg(m_cachedControllerType[side].c_str(), "Type"));
                 rebindControllerActions(side);
             }
@@ -1006,6 +1038,72 @@ namespace pimax_openxr {
                                           (m_cachedInputState.HandButtons[side] & pvrButton_Trigger));
         }
         m_lastForcedInteractionProfile = m_forcedInteractionProfile;
+
+        // Handle Vive Trackers attach/detach.
+        {
+            constexpr pvrTrackedDeviceType tracker[] = {pvrTrackedDevice_Tracker0,
+                                                        pvrTrackedDevice_Tracker1,
+                                                        pvrTrackedDevice_Tracker2,
+                                                        pvrTrackedDevice_Tracker3,
+                                                        pvrTrackedDevice_Tracker4,
+                                                        pvrTrackedDevice_Tracker5,
+                                                        pvrTrackedDevice_Tracker6,
+                                                        pvrTrackedDevice_Tracker7,
+                                                        pvrTrackedDevice_Tracker8,
+                                                        pvrTrackedDevice_Tracker9,
+                                                        pvrTrackedDevice_Tracker10,
+                                                        pvrTrackedDevice_Tracker11,
+                                                        pvrTrackedDevice_Tracker12};
+
+            const uint32_t numTrackers = pvr_getTrackerCount(m_pvrSession);
+            std::map<std::string, uint32_t> trackers;
+            for (uint32_t i = 0; i < numTrackers; i++) {
+                const int size = pvr_getTrackedDeviceStringProperty(
+                    m_pvrSession, tracker[i], pvrTrackedDeviceProp_Serial_String, nullptr, 0);
+                if (size > 0) {
+                    std::string serial;
+                    serial.resize(size, 0);
+                    pvr_getTrackedDeviceStringProperty(m_pvrSession,
+                                                       tracker[i],
+                                                       pvrTrackedDeviceProp_Serial_String,
+                                                       serial.data(),
+                                                       (int)serial.size() + 1);
+                    // Remove trailing 0.
+                    serial.resize(size - 1, 0);
+                    std::transform(
+                        serial.begin(), serial.end(), serial.begin(), [](unsigned char c) { return std::tolower(c); });
+
+                    // Generate a connected event.
+                    if (m_trackers.find(serial) == m_trackers.end()) {
+                        Log("Detected tracker: %s\n", serial.c_str());
+                        TraceLoggingWrite(g_traceProvider,
+                                          "PVR_Tracker",
+                                          TLArg(i, "Index"),
+                                          TLArg(serial.c_str(), "Serial"),
+                                          TLArg(getTrackerRolePath(serial).c_str(), "RolePath"));
+                        m_trackersNotifications.push_back(serial);
+
+                        rebindTrackerActions(serial, true);
+                    }
+                    trackers.insert_or_assign(serial, i);
+                }
+            }
+
+            std::unique_lock lock(m_trackersLock);
+
+            if (m_trackers.size() != trackers.size()) {
+                // Unbind trackers that were disconnected.
+                for (const auto& tracker : m_trackers) {
+                    const std::string& serial = tracker.first;
+
+                    if (trackers.find(serial) == trackers.cend()) {
+                        rebindTrackerActions(serial, false);
+                    }
+                }
+            }
+
+            m_trackers = trackers;
+        }
 
         // Execute built-in actions.
         handleBuiltinActions(wasRecenteringPressed);
@@ -1064,9 +1162,6 @@ namespace pimax_openxr {
             }
         }
 
-        TraceLoggingWrite(
-            g_traceProvider, "xrEnumerateBoundSourcesForAction", TLArg(*sourceCountOutput, "SourceCountOutput"));
-
         return XR_SUCCESS;
     }
 
@@ -1107,11 +1202,45 @@ namespace pimax_openxr {
         std::string localizedName;
         if (!isActionEyeTracker(path)) {
             const int side = getActionSide(path);
-            if (side >= 0) {
+            std::string trackerRole;
+            if (startsWith(path, "/user/vive_tracker_htcx/role/")) {
+                trackerRole = path.substr(29);
+            }
+            if (side >= 0 || !trackerRole.empty()) {
                 bool needSpace = false;
 
                 if ((getInfo->whichComponents & XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT)) {
-                    localizedName += side == 0 ? "Left Hand" : "Right Hand";
+                    if (side >= 0) {
+                        localizedName += side == xr::Side::Left ? "Left Hand" : "Right Hand";
+                    } else {
+                        if (trackerRole == "handheld_object") {
+                            localizedName += "Object held in hand";
+                        } else if (trackerRole == "left_foot") {
+                            localizedName += "Left Foot";
+                        } else if (trackerRole == "right_foot") {
+                            localizedName += "Right Foot";
+                        } else if (trackerRole == "left_shoulder") {
+                            localizedName += "Left Shoulder";
+                        } else if (trackerRole == "right_shoulder") {
+                            localizedName += "Right Shoulder";
+                        } else if (trackerRole == "left_elbow") {
+                            localizedName += "Left Elbow";
+                        } else if (trackerRole == "right_elbow") {
+                            localizedName += "Right Elbow";
+                        } else if (trackerRole == "left_knee") {
+                            localizedName += "Left Knee";
+                        } else if (trackerRole == "right_knee") {
+                            localizedName += "Right Knee";
+                        } else if (trackerRole == "waist") {
+                            localizedName += "Waist";
+                        } else if (trackerRole == "chest") {
+                            localizedName += "Chest";
+                        } else if (trackerRole == "camera") {
+                            localizedName += "Camera";
+                        } else if (trackerRole == "keyboard") {
+                            localizedName += "Keyboard";
+                        }
+                    }
                     needSpace = true;
                 }
 
@@ -1119,7 +1248,11 @@ namespace pimax_openxr {
                     if (needSpace) {
                         localizedName += " ";
                     }
-                    localizedName += m_localizedControllerType[side];
+                    if (side >= 0) {
+                        localizedName += m_localizedControllerType[side];
+                    } else {
+                        localizedName += "Vive Tracker";
+                    }
                     needSpace = true;
                 }
 
@@ -1127,14 +1260,18 @@ namespace pimax_openxr {
                     if (needSpace) {
                         localizedName += " ";
                     }
-                    if (m_cachedControllerType[side] == "vive_controller") {
-                        localizedName += getViveControllerLocalizedSourceName(path);
-                    } else if (m_cachedControllerType[side] == "knuckles") {
-                        localizedName += getIndexControllerLocalizedSourceName(path);
-                    } else if (m_cachedControllerType[side] == "pimax_crystal") {
-                        localizedName += getCrystalControllerLocalizedSourceName(path);
+                    if (side >= 0) {
+                        if (m_cachedControllerType[side] == "vive_controller") {
+                            localizedName += getViveControllerLocalizedSourceName(path);
+                        } else if (m_cachedControllerType[side] == "knuckles") {
+                            localizedName += getIndexControllerLocalizedSourceName(path);
+                        } else if (m_cachedControllerType[side] == "pimax_crystal") {
+                            localizedName += getCrystalControllerLocalizedSourceName(path);
+                        } else {
+                            localizedName += getSimpleControllerLocalizedSourceName(path);
+                        }
                     } else {
-                        localizedName += getSimpleControllerLocalizedSourceName(path);
+                        localizedName += getViveTrackerLocalizedSourceName(path);
                     }
                     needSpace = true;
                 }
@@ -1229,7 +1366,8 @@ namespace pimax_openxr {
 
             // We only support hands paths, not gamepad etc.
             const int side = getActionSide(fullPath);
-            if (isOutput && side >= 0) {
+            const int trackerIndex = getTrackerIndex(fullPath);
+            if (isOutput && (side >= 0 || trackerIndex >= 0)) {
                 const XrHapticBaseHeader* entry = reinterpret_cast<const XrHapticBaseHeader*>(hapticFeedback);
                 while (entry) {
                     if (entry->type == XR_TYPE_HAPTIC_VIBRATION) {
@@ -1241,14 +1379,30 @@ namespace pimax_openxr {
                                           TLArg(vibration->frequency, "Frequency"),
                                           TLArg(vibration->duration, "Duration"));
 
+                        constexpr pvrTrackedDeviceType tracker[] = {pvrTrackedDevice_Tracker0,
+                                                                    pvrTrackedDevice_Tracker1,
+                                                                    pvrTrackedDevice_Tracker2,
+                                                                    pvrTrackedDevice_Tracker3,
+                                                                    pvrTrackedDevice_Tracker4,
+                                                                    pvrTrackedDevice_Tracker5,
+                                                                    pvrTrackedDevice_Tracker6,
+                                                                    pvrTrackedDevice_Tracker7,
+                                                                    pvrTrackedDevice_Tracker8,
+                                                                    pvrTrackedDevice_Tracker9,
+                                                                    pvrTrackedDevice_Tracker10,
+                                                                    pvrTrackedDevice_Tracker11,
+                                                                    pvrTrackedDevice_Tracker12};
+
                         // NOTE: PVR only supports pulses, so there is nothing we can do with the
                         // frequency/duration? OpenComposite seems to pass an amplitude of 0 sometimes, which is not
                         // supported.
                         if (vibration->amplitude > 0) {
-                            CHECK_PVRCMD(pvr_triggerHapticPulse(m_pvrSession,
-                                                                side == 0 ? pvrTrackedDevice_LeftController
-                                                                          : pvrTrackedDevice_RightController,
-                                                                vibration->amplitude));
+                            CHECK_PVRCMD(pvr_triggerHapticPulse(
+                                m_pvrSession,
+                                side == xr::Side::Left ? pvrTrackedDevice_LeftController
+                                                       : (side == xr::Side::Right ? pvrTrackedDevice_RightController
+                                                                                  : tracker[trackerIndex]),
+                                vibration->amplitude));
                         }
                         break;
                     }
@@ -1482,12 +1636,14 @@ namespace pimax_openxr {
 
         TraceLoggingWrite(g_traceProvider,
                           "xrSyncActions",
-                          TLArg(side == 0 ? "Left" : "Right", "Side"),
+                          TLArg(side == xr::Side::Left ? "Left" : "Right", "Side"),
                           TLArg(actualInteractionProfile.c_str(), "InteractionProfile"));
 
         const auto prevInterationProfile = m_currentInteractionProfile[side];
         if (!actualInteractionProfile.empty()) {
-            Log("Using interaction profile: %s (%s)\n", actualInteractionProfile.c_str(), side == 0 ? "Left" : "Right");
+            Log("Using interaction profile: %s (%s)\n",
+                actualInteractionProfile.c_str(),
+                side == xr::Side::Left ? "Left" : "Right");
 
             CHECK_XRCMD(
                 xrStringToPath(XR_NULL_HANDLE, actualInteractionProfile.c_str(), &m_currentInteractionProfile[side]));
@@ -1495,7 +1651,7 @@ namespace pimax_openxr {
             auto adjustedGripPose = Pose::Multiply(m_controllerGripOffset, gripPose);
             auto adjustedAimPose = Pose::Multiply(m_controllerAimOffset, aimPose);
             auto adjustedHandPose = Pose::Multiply(m_controllerHandOffset, handPose);
-            if (side == 1) {
+            if (side == xr::Side::Right) {
                 const auto flipHandedness = [&](XrPosef& pose) {
                     // Mirror pose along the X axis.
                     // https://stackoverflow.com/a/33999726/15056285
@@ -1521,6 +1677,77 @@ namespace pimax_openxr {
             (m_currentInteractionProfile[side] != prevInterationProfile && !m_activeActionSets.empty());
     }
 
+    void OpenXrRuntime::rebindTrackerActions(const std::string& serial, bool connected) {
+        const std::string rolePath = getTrackerRolePath(serial);
+        if (rolePath.empty()) {
+            return;
+        }
+
+        // Remove all old bindings for this controller.
+        for (const auto& action : m_actions) {
+            Action& xrAction = *(Action*)action;
+
+            for (auto it = xrAction.actionSources.begin(); it != xrAction.actionSources.end();) {
+                if (startsWith(it->first, rolePath)) {
+                    it = xrAction.actionSources.erase(it);
+                } else {
+                    it++;
+                }
+            }
+        }
+
+        if (!connected) {
+            return;
+        }
+
+        // Map all possible actions sources for this controller.
+        auto bindings = m_suggestedBindings.find("/interaction_profiles/htc/vive_tracker_htcx");
+        if (bindings != m_suggestedBindings.cend()) {
+            const auto& mapping = m_controllerMappingTable
+                                      .find(std::make_pair("/interaction_profiles/htc/vive_tracker_htcx",
+                                                           "/interaction_profiles/htc/vive_tracker_htcx"))
+                                      ->second;
+            for (const auto& binding : bindings->second) {
+                if (!m_actions.count(binding.action)) {
+                    continue;
+                }
+
+                const auto& sourcePath = getXrPath(binding.binding);
+                if (!startsWith(sourcePath, rolePath)) {
+                    continue;
+                }
+
+                Action& xrAction = *(Action*)binding.action;
+
+                // Map to the PVR input state.
+                ActionSource newSource{};
+                if (mapping(xrAction, binding.binding, newSource)) {
+                    // Avoid duplicates.
+                    bool duplicated = false;
+                    for (const auto& source : xrAction.actionSources) {
+                        if (source.second.realPath == newSource.realPath) {
+                            duplicated = true;
+                            break;
+                        }
+                    }
+
+                    if (!duplicated) {
+                        TraceLoggingWrite(g_traceProvider,
+                                          "xrSyncActions_MapActionSource",
+                                          TLXArg(binding.action, "Action"),
+                                          TLXArg(xrAction.actionSet, "ActionSet"),
+                                          TLArg(sourcePath.c_str(), "ActionPath"),
+                                          TLArg(newSource.realPath.c_str(), "SourcePath"));
+
+                        // TODO: PVR does not seem to handle GPIOs on the trackers, so there are no inputs to bind here.
+
+                        xrAction.actionSources.insert_or_assign(sourcePath, newSource);
+                    }
+                }
+            }
+        }
+    }
+
     std::string OpenXrRuntime::getXrPath(XrPath path) const {
         if (path == XR_NULL_PATH) {
             return "";
@@ -1536,19 +1763,16 @@ namespace pimax_openxr {
 
     int OpenXrRuntime::getActionSide(const std::string& fullPath, bool allowExtraPaths) const {
         if (startsWith(fullPath, "/user/hand/left")) {
-            return 0;
+            return xr::Side::Left;
         } else if (startsWith(fullPath, "/user/hand/right")) {
-            return 1;
-        } else if (allowExtraPaths && (startsWith(fullPath, "/user/head") || startsWith(fullPath, "/user/gamepad") ||
-                                       startsWith(fullPath, "/user/eyes_ext"))) {
-            return 2;
+            return xr::Side::Right;
+        } else if (allowExtraPaths &&
+                   (startsWith(fullPath, "/user/head") || startsWith(fullPath, "/user/gamepad") ||
+                    startsWith(fullPath, "/user/eyes_ext") || startsWith(fullPath, "/user/vive_tracker_htcx"))) {
+            return xr::Side::Count; // Valid, but not a side.
         }
 
         return -1;
-    }
-
-    bool OpenXrRuntime::isActionEyeTracker(const std::string& fullPath) const {
-        return fullPath == "/user/eyes_ext/input/gaze_ext/pose";
     }
 
     XrVector2f OpenXrRuntime::handleJoystickDeadzone(pvrVector2f raw) const {
