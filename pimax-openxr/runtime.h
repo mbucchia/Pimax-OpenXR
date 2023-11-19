@@ -466,7 +466,6 @@ namespace pimax_openxr {
                                             uint32_t layerIndex,
                                             uint32_t slice,
                                             XrCompositionLayerFlags compositionFlags,
-                                            bool isFocusView,
                                             std::set<std::pair<pvrTextureSwapChain, uint32_t>>& committed);
         void ensureSwapchainSliceResources(Swapchain& xrSwapchain, uint32_t slice) const;
         void ensureSwapchainIntermediateResources(Swapchain& xrSwapchain) const;
@@ -558,12 +557,6 @@ namespace pimax_openxr {
 #endif
         float m_droolonProjectionDistance{0.35f};
         bool m_isEyeTrackingAvailable{false};
-        float m_focusPixelDensity{1.f};
-        float m_peripheralPixelDensity{0.5f};
-        // [0] = non-foveated, [1] = foveated
-        float m_horizontalFovSection[2]{0.75f, 0.5f};
-        float m_verticalFovSection[2]{0.7f, 0.5f};
-        bool m_preferFoveatedRendering{true};
 
         // Session state.
         ComPtr<ID3D11Device5> m_pvrSubmissionDevice;
@@ -585,11 +578,7 @@ namespace pimax_openxr {
         bool m_sessionExiting{false};
         bool m_useParallelProjection{false};
         int m_fovLevel{0};
-        // [0] = left, [1] = right
-        // [2] = left focus non-foveated, [3] = right focus non-foveated,
-        // [4] = left focus foveated, [5] = right focus foveated
-        XrFovf m_cachedEyeFov[xr::QuadView::Count + 2];
-        XrVector2f m_centerOfFov[xr::StereoView::Count];
+        XrFovf m_cachedEyeFov[xr::StereoView::Count];
         std::mutex m_actionsAndSpacesMutex;
         std::map<XrPath, std::string> m_strings; // protected by actionsAndSpacesMutex
         std::set<XrActionSet> m_actionSets;
@@ -626,8 +615,6 @@ namespace pimax_openxr {
         bool m_useDeferredFrameWaitThisFrame{false};
         bool m_honorPremultiplyFlagOnProj0{false};
         bool m_useRunningStart{true};
-        bool m_debugFocusViews{false};
-        bool m_postProcessFocusView{true};
 
         // Swapchains and other graphics stuff.
         std::mutex m_swapchainsMutex;
@@ -732,10 +719,6 @@ namespace pimax_openxr {
         std::deque<uint64_t> m_frameTimeFilter;
         bool m_isSmartSmoothingEnabled{false};
         bool m_isSmartSmoothingActive{false};
-
-        // FOV submission correction.
-        bool m_needFocusFovCorrectionQuirk{false};
-        std::map<XrTime, std::pair<XrFovf, XrFovf>> m_focusFovForDisplayTime; // protected by actionsAndSpacesMutex
 
         // Statistics.
         AppInsights m_telemetry;

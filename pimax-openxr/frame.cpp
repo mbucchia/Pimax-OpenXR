@@ -445,10 +445,7 @@ namespace pimax_openxr {
 
             // Construct the list of layers.
             std::vector<pvrLayer_Union> layersAllocator;
-            layersAllocator.reserve(
-                frameEndInfo->layerCount *
-                    (m_primaryViewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO ? 2 : 1) +
-                1);
+            layersAllocator.reserve(frameEndInfo->layerCount + 1);
             for (uint32_t i = 0; i < frameEndInfo->layerCount; i++) {
                 if (!frameEndInfo->layers[i]) {
                     return XR_ERROR_LAYER_INVALID;
@@ -479,11 +476,7 @@ namespace pimax_openxr {
                                       TLArg(proj->layerFlags, "Flags"),
                                       TLXArg(proj->space, "Space"));
 
-                    const uint32_t viewCount =
-                        (m_primaryViewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO
-                             ? xr::StereoView::Count
-                             : xr::QuadView::Count);
-                    if (proj->viewCount != viewCount) {
+                    if (proj->viewCount != xr::StereoView::Count) {
                         return XR_ERROR_VALIDATION_FAILURE;
                     }
 
@@ -502,21 +495,9 @@ namespace pimax_openxr {
                     // Start without depth. We might change the type to pvrLayerType_EyeFovDepth further below.
                     layer->Header.Type = pvrLayerType_EyeFov;
 
-                    for (uint32_t viewIndex = 0; viewIndex < viewCount; viewIndex++) {
+                    for (uint32_t viewIndex = 0; viewIndex < xr::StereoView::Count; viewIndex++) {
                         if (viewIndex == 0) {
                             m_proj0Extent = proj->views[viewIndex].subImage.imageRect.extent;
-                        }
-
-                        // Quad views uses 2 stereo layers.
-                        if (viewIndex == xr::StereoView::Count) {
-                            // Push this layer and start a new one.
-                            const auto flags = layer->Header.Flags;
-                            if (!m_debugFocusViews) {
-                                layersAllocator.push_back({});
-                            }
-                            layer = &layersAllocator.back();
-                            layer->Header.Flags = flags;
-                            layer->Header.Type = pvrLayerType_EyeFov;
                         }
 
                         TraceLoggingWrite(
@@ -552,61 +533,36 @@ namespace pimax_openxr {
                             isProj0SRGB = isSRGBFormat(xrSwapchain.dxgiFormatForSubmission);
                         }
 
-                        const uint32_t pvrViewIndex = viewIndex % xr::StereoView::Count;
-
                         // Fill out color buffer information.
                         prepareAndCommitSwapchainImage(xrSwapchain,
                                                        i,
                                                        proj->views[viewIndex].subImage.imageArrayIndex,
                                                        frameEndInfo->layers[i]->layerFlags,
-                                                       viewIndex >= xr::StereoView::Count,
                                                        committedSwapchainImages);
-                        layer->EyeFov.ColorTexture[pvrViewIndex] =
+                        layer->EyeFov.ColorTexture[viewIndex] =
                             xrSwapchain.pvrSwapchain[proj->views[viewIndex].subImage.imageArrayIndex];
 
                         if (!isValidSwapchainRect(xrSwapchain.pvrDesc, proj->views[viewIndex].subImage.imageRect)) {
                             return XR_ERROR_SWAPCHAIN_RECT_INVALID;
                         }
-                        layer->EyeFov.Viewport[pvrViewIndex].x = proj->views[viewIndex].subImage.imageRect.offset.x;
-                        layer->EyeFov.Viewport[pvrViewIndex].y = proj->views[viewIndex].subImage.imageRect.offset.y;
-                        layer->EyeFov.Viewport[pvrViewIndex].width =
+                        layer->EyeFov.Viewport[viewIndex].x = proj->views[viewIndex].subImage.imageRect.offset.x;
+                        layer->EyeFov.Viewport[viewIndex].y = proj->views[viewIndex].subImage.imageRect.offset.y;
+                        layer->EyeFov.Viewport[viewIndex].width =
                             proj->views[viewIndex].subImage.imageRect.extent.width;
-                        layer->EyeFov.Viewport[pvrViewIndex].height =
+                        layer->EyeFov.Viewport[viewIndex].height =
                             proj->views[viewIndex].subImage.imageRect.extent.height;
 
                         // Fill out pose and FOV information.
                         XrPosef layerPose;
                         locateSpace(*(Space*)proj->space, *m_originSpace, frameEndInfo->displayTime, layerPose);
-                        layer->EyeFov.RenderPose[pvrViewIndex] =
+                        layer->EyeFov.RenderPose[viewIndex] =
                             xrPoseToPvrPose(Pose::Multiply(proj->views[viewIndex].pose, layerPose));
 
-                        XrFovf fov = proj->views[viewIndex].fov;
-                        if (m_needFocusFovCorrectionQuirk && viewIndex >= xr::StereoView::Count) {
-                            // Quirk for DCS World: the application does not pass the correct FOV for the focus views in
-                            // xrEndFrame(). We must keep track of the correct values for each frame.
-                            const auto& cit = m_focusFovForDisplayTime.find(frameEndInfo->displayTime);
-                            if (cit != m_focusFovForDisplayTime.cend()) {
-                                const XrFovf& patchedFov =
-                                    viewIndex == xr::QuadView::FocusLeft ? cit->second.first : cit->second.second;
-                                if (IsTraceEnabled() &&
-                                    (std::abs(patchedFov.angleDown - fov.angleDown) > FLT_EPSILON ||
-                                     std::abs(patchedFov.angleUp - fov.angleUp) > FLT_EPSILON ||
-                                     std::abs(patchedFov.angleLeft - fov.angleLeft) > FLT_EPSILON ||
-                                     std::abs(patchedFov.angleRight - fov.angleRight) > FLT_EPSILON)) {
-                                    TraceLoggingWrite(g_traceProvider,
-                                                      "xrEndFrame_View",
-                                                      TLArg("Proj", "Type"),
-                                                      TLArg(viewIndex, "ViewIndex"),
-                                                      TLArg(xr::ToString(patchedFov).c_str(), "PatchedFov"));
-                                }
-                                fov = patchedFov;
-                            }
-                        }
-
-                        layer->EyeFov.Fov[pvrViewIndex].DownTan = -tan(fov.angleDown);
-                        layer->EyeFov.Fov[pvrViewIndex].UpTan = tan(fov.angleUp);
-                        layer->EyeFov.Fov[pvrViewIndex].LeftTan = -tan(fov.angleLeft);
-                        layer->EyeFov.Fov[pvrViewIndex].RightTan = tan(fov.angleRight);
+                        const XrFovf fov = proj->views[viewIndex].fov;
+                        layer->EyeFov.Fov[viewIndex].DownTan = -tan(fov.angleDown);
+                        layer->EyeFov.Fov[viewIndex].UpTan = tan(fov.angleUp);
+                        layer->EyeFov.Fov[viewIndex].LeftTan = -tan(fov.angleLeft);
+                        layer->EyeFov.Fov[viewIndex].RightTan = tan(fov.angleRight);
 
                         // Per Pimax: this value is currently unused, but should be set to the timestamp of the head
                         // pose. In the case of OpenXR, we expect the app to use the predictedDisplayTime to query the
@@ -653,13 +609,14 @@ namespace pimax_openxr {
                                     }
 
                                     // Fill out depth buffer information.
-                                    prepareAndCommitSwapchainImage(xrDepthSwapchain,
-                                                                   i,
-                                                                   depth->subImage.imageArrayIndex,
-                                                                   XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT /* Not applicable for depth */,
-                                                                   false,
-                                                                   committedSwapchainImages);
-                                    layer->EyeFovDepth.DepthTexture[pvrViewIndex] =
+                                    prepareAndCommitSwapchainImage(
+                                        xrDepthSwapchain,
+                                        i,
+                                        depth->subImage.imageArrayIndex,
+                                        XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT, /* Not applicable for depth
+                                                                                              */
+                                        committedSwapchainImages);
+                                    layer->EyeFovDepth.DepthTexture[viewIndex] =
                                         xrDepthSwapchain.pvrSwapchain[depth->subImage.imageArrayIndex];
 
                                     if (!isValidSwapchainRect(xrDepthSwapchain.pvrDesc, depth->subImage.imageRect)) {
@@ -679,10 +636,6 @@ namespace pimax_openxr {
                             }
                         }
                     }
-
-                    // Warning: quad views might have created 2 layers above!
-                    // One of them was pushed already to the list of layers.
-
                     isFirstProjectionLayer = false;
 
                 } else if (frameEndInfo->layers[i]->type == XR_TYPE_COMPOSITION_LAYER_QUAD) {
@@ -736,7 +689,6 @@ namespace pimax_openxr {
                                                    i,
                                                    quad->subImage.imageArrayIndex,
                                                    frameEndInfo->layers[i]->layerFlags,
-                                                   false,
                                                    committedSwapchainImages);
                     layer->Quad.ColorTexture = xrSwapchain.pvrSwapchain[quad->subImage.imageArrayIndex];
 
@@ -974,17 +926,6 @@ namespace pimax_openxr {
             m_useDeferredFrameWaitThisFrame = m_useDeferredFrameWait;
 
             m_sessionTotalFrameCount++;
-
-            if (m_needFocusFovCorrectionQuirk) {
-                // Delete all entries older than 1s.
-                while (!m_focusFovForDisplayTime.empty() &&
-                       m_focusFovForDisplayTime.cbegin()->first < frameEndInfo->displayTime - 1'000'000'000) {
-                    m_focusFovForDisplayTime.erase(m_focusFovForDisplayTime.begin());
-                }
-                TraceLoggingWrite(g_traceProvider,
-                                  "xrEndFrame",
-                                  TLArg(m_focusFovForDisplayTime.size(), "FovForDisplayTimeDictionarySize"));
-            }
 
             // Signal xrBeginFrame().
             TraceLoggingWrite(g_traceProvider,

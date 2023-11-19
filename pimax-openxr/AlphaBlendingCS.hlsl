@@ -5,7 +5,6 @@
 cbuffer config : register(b0) {
     bool ignoreAlpha;
     bool isUnpremultipliedAlpha;
-    bool isFocusView;
 };
 
 Texture2D in_texture : register(t0);
@@ -16,5 +15,5 @@ void main(uint2 pos : SV_DispatchThreadID) {
     uint width, height;
     in_texture.GetDimensions(width, height);
     out_texture[pos] =
-        processAlpha(in_texture[pos], pos, uint2(width, height), ignoreAlpha, isUnpremultipliedAlpha, isFocusView);
+        processAlpha(in_texture[pos], pos, uint2(width, height), ignoreAlpha, isUnpremultipliedAlpha);
 }

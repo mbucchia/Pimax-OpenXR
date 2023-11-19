@@ -130,10 +130,8 @@ namespace pimax_openxr {
             m_isEyeTrackingAvailable = getSetting("allow_eye_tracking").value_or(false);
 
             // Detect eye tracker. This can take a while, so only do it when the app is requesting it.
-            m_preferFoveatedRendering = getSetting("prefer_foveated_rendering").value_or(false);
             m_eyeTrackingType = EyeTracking::None;
-            if ((has_XR_VARJO_quad_views && (has_XR_VARJO_foveated_rendering || m_preferFoveatedRendering)) ||
-                has_XR_EXT_eye_gaze_interaction) {
+            if (has_XR_EXT_eye_gaze_interaction) {
                 if (getSetting("debug_eye_tracker").value_or(false)) {
                     m_eyeTrackingType = EyeTracking::Simulated;
                 } else if (m_cachedHmdInfo.VendorId == 0x34A4 && m_cachedHmdInfo.ProductId == 0x0012) {
@@ -148,7 +146,7 @@ namespace pimax_openxr {
 #endif
             }
             if (m_eyeTrackingType == EyeTracking::None) {
-                m_isEyeTrackingAvailable = m_preferFoveatedRendering = false;
+                m_isEyeTrackingAvailable = false;
             }
 
             // Cache common information.
@@ -191,82 +189,6 @@ namespace pimax_openxr {
                                   TLArg(xr::ToString(m_cachedEyeInfo[i].HmdToEyePose).c_str(), "EyePose"),
                                   TLArg(xr::ToString(m_cachedEyeFov[i]).c_str(), "Fov"),
                                   TLArg(i == xr::StereoView::Left ? -cantingAngle : cantingAngle, "Canting"));
-            }
-
-            // Compute quad views FOV.
-            if (has_XR_VARJO_quad_views) {
-                // Latch the configuration for quad views and foveated rendering.
-                m_focusPixelDensity = getSetting("focus_density").value_or(1100) / 1e3f;
-                m_peripheralPixelDensity = getSetting("peripheral_density").value_or(400) / 1e3f;
-                m_horizontalFovSection[0] = getSetting("focus_horizontal_section").value_or(650) / 1e3f;
-                m_horizontalFovSection[1] = getSetting("focus_horizontal_section_foveated").value_or(330) / 1e3f;
-                m_verticalFovSection[0] = getSetting("focus_vertical_section").value_or(700) / 1e3f;
-                m_verticalFovSection[1] = getSetting("focus_vertical_section_foveated").value_or(310) / 1e3f;
-
-                // The horizontal sections are relative to small FOV level, transpose them into the current FOV level.
-                // Each FOV level adds 20 degree.
-                const float horizontalScale[4] = {1.333f, 1.166f, 1.f, 0.833f};
-                m_horizontalFovSection[0] /= horizontalScale[std::clamp(m_fovLevel, 0, 4)];
-                m_horizontalFovSection[1] /= horizontalScale[std::clamp(m_fovLevel, 0, 4)];
-
-                TraceLoggingWrite(g_traceProvider,
-                                  "PXR_Config",
-                                  TLArg(m_focusPixelDensity, "FocusDensity"),
-                                  TLArg(m_peripheralPixelDensity, "PeripheralDensity"),
-                                  TLArg(m_horizontalFovSection[0], "FocusHorizontalSection"),
-                                  TLArg(m_horizontalFovSection[1], "FocusHorizontalSectionFoveated"),
-                                  TLArg(m_verticalFovSection[0], "FocusVerticalSection"),
-                                  TLArg(m_verticalFovSection[1], "FocusVerticalSectionFoveated"),
-                                  TLArg(m_preferFoveatedRendering, "PreferFoveatedRendering"));
-
-                XrVector2f projectedGaze[xr::StereoView::Count]{{}, {}};
-                {
-                    // Calculate poses for each eye.
-                    pvrPosef hmdToEyePose[xr::StereoView::Count];
-                    hmdToEyePose[xr::StereoView::Left] = m_cachedEyeInfo[xr::StereoView::Left].HmdToEyePose;
-                    hmdToEyePose[xr::StereoView::Right] = m_cachedEyeInfo[xr::StereoView::Right].HmdToEyePose;
-
-                    pvrPosef eyePoses[xr::StereoView::Count]{{}, {}};
-                    pvr_calcEyePoses(m_pvr, PVR::Posef::Identity(), hmdToEyePose, eyePoses);
-
-                    for (uint32_t eye = 0; eye < xr::StereoView::Count; eye++) {
-                        XrView view{};
-                        view.pose = pvrPoseToXrPose(eyePoses[eye]);
-                        view.fov = m_cachedEyeFov[eye];
-
-                        // Calculate the "resting" gaze position.
-                        ProjectPoint(view, {0.f, 0.f, -1.f}, projectedGaze[eye]);
-                        m_centerOfFov[eye].x = (projectedGaze[eye].x + 1.f) / 2.f;
-                        m_centerOfFov[eye].y = (1.f - projectedGaze[eye].y) / 2.f;
-                    }
-                }
-
-                for (uint32_t foveated = 0; foveated <= 1; foveated++) {
-                    for (uint32_t eye = 0; eye < xr::StereoView::Count; eye++) {
-                        const uint32_t viewIndex = 2 + (foveated * 2) + eye;
-
-                        // Apply the FOV multiplier.
-                        std::tie(m_cachedEyeFov[viewIndex].angleLeft, m_cachedEyeFov[viewIndex].angleRight) =
-                            Fov::Scale(std::make_pair(m_cachedEyeFov[eye].angleLeft, m_cachedEyeFov[eye].angleRight),
-                                       m_horizontalFovSection[foveated]);
-                        std::tie(m_cachedEyeFov[viewIndex].angleDown, m_cachedEyeFov[viewIndex].angleUp) =
-                            Fov::Scale(std::make_pair(m_cachedEyeFov[eye].angleDown, m_cachedEyeFov[eye].angleUp),
-                                       m_verticalFovSection[foveated]);
-
-                        // Adjust for (fixed) gaze.
-                        std::tie(m_cachedEyeFov[viewIndex].angleLeft, m_cachedEyeFov[viewIndex].angleRight) = Fov::Lerp(
-                            std::make_pair(m_cachedEyeFov[eye].angleLeft, m_cachedEyeFov[eye].angleRight),
-                            std::make_pair(m_cachedEyeFov[viewIndex].angleLeft, m_cachedEyeFov[viewIndex].angleRight),
-                            m_centerOfFov[eye].x);
-                        std::tie(m_cachedEyeFov[viewIndex].angleDown, m_cachedEyeFov[viewIndex].angleUp) = Fov::Lerp(
-                            std::make_pair(m_cachedEyeFov[eye].angleDown, m_cachedEyeFov[eye].angleUp),
-                            std::make_pair(m_cachedEyeFov[viewIndex].angleDown, m_cachedEyeFov[viewIndex].angleUp),
-                            m_centerOfFov[eye].y);
-                    }
-                }
-            } else {
-                m_cachedEyeFov[xr::QuadView::FocusLeft] = m_cachedEyeFov[xr::QuadView::FocusRight] = {};
-                m_peripheralPixelDensity = m_focusPixelDensity = 1.f;
             }
 
             // Setup common parameters.
@@ -319,15 +241,6 @@ namespace pimax_openxr {
                 reinterpret_cast<XrSystemEyeGazeInteractionPropertiesEXT*>(eyeGazeInteractionProperties->next);
         }
 
-        XrSystemFoveatedRenderingPropertiesVARJO* foveatedProperties =
-            reinterpret_cast<XrSystemFoveatedRenderingPropertiesVARJO*>(properties->next);
-        while (foveatedProperties) {
-            if (foveatedProperties->type == XR_TYPE_SYSTEM_FOVEATED_RENDERING_PROPERTIES_VARJO) {
-                break;
-            }
-            foveatedProperties = reinterpret_cast<XrSystemFoveatedRenderingPropertiesVARJO*>(foveatedProperties->next);
-        }
-
         properties->vendorId = m_cachedHmdInfo.VendorId;
 
         sprintf_s(properties->systemName, sizeof(properties->systemName), "%s", m_cachedHmdInfo.ProductName);
@@ -371,15 +284,6 @@ namespace pimax_openxr {
                 TLArg(!!eyeGazeInteractionProperties->supportsEyeGazeInteraction, "SupportsEyeGazeInteraction"));
         }
 
-        if (has_XR_VARJO_foveated_rendering && foveatedProperties) {
-            foveatedProperties->supportsFoveatedRendering = m_isEyeTrackingAvailable ? XR_TRUE : XR_FALSE;
-
-            TraceLoggingWrite(g_traceProvider,
-                              "xrGetSystemProperties",
-                              TLArg((int)properties->systemId, "SystemId"),
-                              TLArg(foveatedProperties->supportsFoveatedRendering, "SupportsFoveatedRendering"));
-        }
-
         return XR_SUCCESS;
     }
 
@@ -408,8 +312,7 @@ namespace pimax_openxr {
             return XR_ERROR_SYSTEM_INVALID;
         }
 
-        if (viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO &&
-            (!has_XR_VARJO_quad_views || viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO)) {
+        if (viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
             return XR_ERROR_VIEW_CONFIGURATION_TYPE_UNSUPPORTED;
         }
 

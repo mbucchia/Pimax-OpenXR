@@ -327,9 +327,7 @@ namespace pimax_openxr {
             return XR_ERROR_HANDLE_INVALID;
         }
 
-        if (beginInfo->primaryViewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO &&
-            (!has_XR_VARJO_quad_views ||
-             beginInfo->primaryViewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO)) {
+        if (beginInfo->primaryViewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
             return XR_ERROR_VIEW_CONFIGURATION_TYPE_UNSUPPORTED;
         }
 
@@ -346,12 +344,6 @@ namespace pimax_openxr {
             startDroolonTracking();
         }
 #endif
-
-        m_primaryViewConfigurationType = beginInfo->primaryViewConfigurationType;
-        if (m_primaryViewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO) {
-            Log("Beginning session with quad views\n");
-            LOG_TELEMETRY_ONCE(logFeature("QuadViews"));
-        }
 
         m_useAsyncSubmission = getSetting("async_submission").value_or(true);
         m_needStartAsyncSubmissionThread = m_useAsyncSubmission;
@@ -533,8 +525,6 @@ namespace pimax_openxr {
         m_useDeferredFrameWait = getSetting("defer_frame_wait").value_or(false);
         m_lockFramerate = getSetting("lock_framerate").value_or(false);
 
-        m_postProcessFocusView = getSetting("postprocess_focus_view").value_or(true);
-
         m_honorPremultiplyFlagOnProj0 = getSetting("honor_premultiply_flag_on_proj0").value_or(false);
 
         m_useRunningStart = !getSetting("quirk_disable_running_start").value_or(false);
@@ -555,7 +545,6 @@ namespace pimax_openxr {
             TLArg(m_droolonProjectionDistance, "DroolonProjectionDistance"),
             TLArg(m_useDeferredFrameWait, "UseDeferredFrameWait"),
             TLArg(m_lockFramerate, "LockFramerate"),
-            TLArg(m_postProcessFocusView, "PostProcessFocusView"),
             TLArg(m_honorPremultiplyFlagOnProj0, "HonorPremultiplyFlagOnProj0"),
             TLArg(m_useRunningStart, "UseRunningStart"),
             TLArg(m_syncGpuWorkInEndFrame, "SyncGpuWorkInEndFrame"));
@@ -574,8 +563,6 @@ namespace pimax_openxr {
         } else {
             m_debugControllerType.clear();
         }
-
-        m_debugFocusViews = getSetting("debug_focus_view").value_or(false);
     }
 
     // Create guardian resources.

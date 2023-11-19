@@ -41,9 +41,6 @@ namespace pimax_openxr {
         referenceSpaces.push_back(XR_REFERENCE_SPACE_TYPE_VIEW);
         referenceSpaces.push_back(XR_REFERENCE_SPACE_TYPE_LOCAL);
         referenceSpaces.push_back(XR_REFERENCE_SPACE_TYPE_STAGE);
-        if (has_XR_VARJO_foveated_rendering) {
-            referenceSpaces.push_back(XR_REFERENCE_SPACE_TYPE_COMBINED_EYE_VARJO);
-        }
 
         TraceLoggingWrite(g_traceProvider,
                           "xrEnumerateReferenceSpaces",
@@ -92,9 +89,7 @@ namespace pimax_openxr {
 
         if (createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_VIEW &&
             createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_LOCAL &&
-            createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_STAGE &&
-            (!has_XR_VARJO_foveated_rendering ||
-             createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_COMBINED_EYE_VARJO)) {
+            createInfo->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_STAGE) {
             return XR_ERROR_REFERENCE_SPACE_UNSUPPORTED;
         }
 
@@ -282,16 +277,11 @@ namespace pimax_openxr {
             return XR_ERROR_TIME_INVALID;
         }
 
-        if (viewLocateInfo->viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO &&
-            (m_primaryViewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO ||
-             viewLocateInfo->viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO)) {
+        if (viewLocateInfo->viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
             return XR_ERROR_VIEW_CONFIGURATION_TYPE_UNSUPPORTED;
         }
 
-        if (viewCapacityInput &&
-            viewCapacityInput < (viewLocateInfo->viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO
-                                     ? xr::StereoView::Count
-                                     : xr::QuadView::Count)) {
+        if (viewCapacityInput && viewCapacityInput < xr::StereoView::Count) {
             return XR_ERROR_SIZE_INSUFFICIENT;
         }
 
@@ -301,45 +291,14 @@ namespace pimax_openxr {
             return XR_ERROR_HANDLE_INVALID;
         }
 
-        *viewCountOutput =
-            (viewLocateInfo->viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO ? xr::StereoView::Count
-                                                                                                : xr::QuadView::Count);
+        *viewCountOutput = xr::StereoView::Count;
         TraceLoggingWrite(g_traceProvider, "xrLocateViews", TLArg(*viewCountOutput, "ViewCountOutput"));
 
         if (viewCapacityInput && views) {
-            // Override default to specify whether foveated rendering is desired when the application does not specify.
-            bool foveatedRenderingActive =
-                viewLocateInfo->viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO &&
-                m_preferFoveatedRendering;
-
-            if (has_XR_VARJO_foveated_rendering) {
-                const XrViewLocateFoveatedRenderingVARJO* foveatedLocate =
-                    reinterpret_cast<const XrViewLocateFoveatedRenderingVARJO*>(viewLocateInfo->next);
-                while (foveatedLocate) {
-                    if (foveatedLocate->type == XR_TYPE_VIEW_LOCATE_FOVEATED_RENDERING_VARJO) {
-                        foveatedRenderingActive = foveatedLocate->foveatedRenderingActive;
-                        break;
-                    }
-                    foveatedLocate = reinterpret_cast<const XrViewLocateFoveatedRenderingVARJO*>(foveatedLocate->next);
-                }
-
-                TraceLoggingWrite(
-                    g_traceProvider, "xrLocateViews", TLArg(foveatedRenderingActive, "FoveatedRenderingActive"));
-            }
-
             // Get the HMD pose in the base space.
             XrPosef headPose;
             viewState->viewStateFlags =
                 locateSpace(*m_viewSpace, *(Space*)viewLocateInfo->space, viewLocateInfo->displayTime, headPose);
-
-            // Query the eye tracker if needed.
-            bool isGazeValid = false;
-            XrVector3f gazeUnitVector{};
-            if (foveatedRenderingActive) {
-                double dummyTime;
-                isGazeValid =
-                    getEyeGaze(viewLocateInfo->displayTime, false /* getStateOnly */, gazeUnitVector, dummyTime);
-            }
 
             if (viewState->viewStateFlags & (XR_VIEW_STATE_POSITION_VALID_BIT | XR_VIEW_STATE_ORIENTATION_VALID_BIT)) {
                 // Calculate poses for each eye.
@@ -357,55 +316,14 @@ namespace pimax_openxr {
                         return XR_ERROR_VALIDATION_FAILURE;
                     }
 
-                    XrView viewForGazeProjection{};
-                    if (i >= xr::StereoView::Count && isGazeValid) {
-                        viewForGazeProjection.pose = pvrPoseToXrPose(hmdToEyePose[i - 2]);
-                        viewForGazeProjection.fov = views[i - 2].fov;
-                    }
                     views[i].pose = pvrPoseToXrPose(eyePoses[i % xr::StereoView::Count]);
-                    XrVector2f projectedGaze;
-                    if (i < xr::StereoView::Count || !isGazeValid ||
-                        !ProjectPoint(viewForGazeProjection, gazeUnitVector, projectedGaze)) {
-                        views[i].fov = m_cachedEyeFov[i];
-
-                    } else {
-                        // Shift FOV according to the eye gaze.
-                        // We also widen the FOV when near the edges of the headset to make sure there's enough overlap
-                        // between the two eyes.
-                        const float MaxWidenAngle = PVR::DegreeToRad(7.f);
-                        constexpr float Deadzone = 0.15f;
-                        const XrVector2f centerOfFov{(projectedGaze.x + 1.f) / 2.f, (1.f - projectedGaze.y) / 2.f};
-                        const XrVector2f v = centerOfFov - m_centerOfFov[i - 2];
-                        const float distanceFromCenter = std::sqrt(v.x * v.x + v.y * v.y);
-                        const float widenHalfAngle =
-                            std::clamp(distanceFromCenter - Deadzone, 0.f, 0.5f) * MaxWidenAngle;
-                        XrFovf globalFov = m_cachedEyeFov[i % xr::StereoView::Count];
-                        std::tie(views[i].fov.angleLeft, views[i].fov.angleRight) =
-                            Fov::Lerp(std::make_pair(globalFov.angleLeft, globalFov.angleRight),
-                                      std::make_pair(m_cachedEyeFov[i + 2].angleLeft - widenHalfAngle,
-                                                     m_cachedEyeFov[i + 2].angleRight + widenHalfAngle),
-                                      centerOfFov.x);
-                        std::tie(views[i].fov.angleDown, views[i].fov.angleUp) =
-                            Fov::Lerp(std::make_pair(globalFov.angleDown, globalFov.angleUp),
-                                      std::make_pair(m_cachedEyeFov[i + 2].angleDown - widenHalfAngle,
-                                                     m_cachedEyeFov[i + 2].angleUp + widenHalfAngle),
-                                      centerOfFov.y);
-                    }
+                    views[i].fov = m_cachedEyeFov[i];
 
                     TraceLoggingWrite(g_traceProvider,
                                       "xrLocateViews",
                                       TLArg(i, "ViewIndex"),
                                       TLArg(xr::ToString(views[i].pose).c_str(), "Pose"),
                                       TLArg(xr::ToString(views[i].fov).c_str(), "Fov"));
-
-                    // Quirk for DCS World: the application does not pass the correct FOV for the focus views in
-                    // xrEndFrame(). We must keep track of the correct values for each frame.
-                    if (m_needFocusFovCorrectionQuirk &&
-                        viewLocateInfo->viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO) {
-                        m_focusFovForDisplayTime.insert_or_assign(
-                            viewLocateInfo->displayTime,
-                            std::make_pair(views[xr::QuadView::FocusLeft].fov, views[xr::QuadView::FocusRight].fov));
-                    }
                 }
             } else {
                 // All or nothing.
@@ -531,14 +449,6 @@ namespace pimax_openxr {
                       XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_POSITION_TRACKED_BIT);
             if (velocity) {
                 velocity->velocityFlags = XR_SPACE_VELOCITY_ANGULAR_VALID_BIT | XR_SPACE_VELOCITY_LINEAR_VALID_BIT;
-            }
-        } else if (xrSpace.referenceType == XR_REFERENCE_SPACE_TYPE_COMBINED_EYE_VARJO) {
-            pose = Pose::Identity();
-
-            XrVector3f dummyVector{};
-            double dummyTime;
-            if (getEyeGaze(time, true /* getStateOnly */, dummyVector, dummyTime)) {
-                result = XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
             }
         } else if (xrSpace.action != XR_NULL_HANDLE) {
             // Action spaces for motion controllers.

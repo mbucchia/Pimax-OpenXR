@@ -43,7 +43,6 @@ namespace pimax_openxr {
     struct AlphaBlendingCSConstants {
         alignas(4) bool ignoreAlpha;
         alignas(4) bool isUnpremultipliedAlpha;
-        alignas(4) bool isFocusView;
     };
 
     // https://www.khronos.org/registry/OpenXR/specs/1.0/html/xrspec.html#xrGetD3D11GraphicsRequirementsKHR
@@ -464,7 +463,6 @@ namespace pimax_openxr {
                                                        uint32_t layerIndex,
                                                        uint32_t slice,
                                                        XrCompositionLayerFlags compositionFlags,
-                                                       bool isFocusView,
                                                        std::set<std::pair<pvrTextureSwapChain, uint32_t>>& committed) {
         // If the texture was never used or already committed, do nothing.
         if (xrSwapchain.slices[0].empty() || committed.count(std::make_pair(xrSwapchain.pvrSwapchain[0], slice))) {
@@ -477,8 +475,6 @@ namespace pimax_openxr {
         CHECK_PVRCMD(pvr_getTextureSwapChainCurrentIndex(m_pvrSession, xrSwapchain.pvrSwapchain[slice], &pvrDestIndex));
         const int lastReleasedIndex = xrSwapchain.lastReleasedIndex;
 
-        const bool postProcessFocusView = m_postProcessFocusView && isFocusView;
-
         const bool needClearAlpha =
             layerIndex > 0 && !(compositionFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT);
         // Workaround: this is questionable, but an app should always submit layer 0 without alpha-blending (ie: alpha =
@@ -486,7 +482,7 @@ namespace pimax_openxr {
         const bool needPremultiplyAlpha = (m_honorPremultiplyFlagOnProj0 || layerIndex > 0) &&
                                           (compositionFlags & XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT);
         const bool needCopy = xrSwapchain.lastProcessedIndex[slice] == lastReleasedIndex ||
-                              (slice > 0 && !(postProcessFocusView || needClearAlpha || needPremultiplyAlpha));
+                              (slice > 0 && !(needClearAlpha || needPremultiplyAlpha));
 
         if (needCopy) {
             // Circumvent some of PVR's limitations:
@@ -503,7 +499,7 @@ namespace pimax_openxr {
                                                           xrSwapchain.slices[0][lastReleasedIndex].Get(),
                                                           slice,
                                                           nullptr);
-        } else if (postProcessFocusView || needClearAlpha || needPremultiplyAlpha) {
+        } else if (needClearAlpha || needPremultiplyAlpha) {
             // Circumvent some of PVR's limitations:
             // - For alpha-blended layers, we must pre-process the alpha channel.
             // For alpha-blended layers with texture arrays, we must also output into slice 0 of
@@ -546,7 +542,6 @@ namespace pimax_openxr {
                 AlphaBlendingCSConstants constants{};
                 constants.ignoreAlpha = needClearAlpha;
                 constants.isUnpremultipliedAlpha = needPremultiplyAlpha;
-                constants.isFocusView = postProcessFocusView;
 
                 D3D11_MAPPED_SUBRESOURCE mappedResources;
                 CHECK_HRCMD(m_pvrSubmissionContext->Map(

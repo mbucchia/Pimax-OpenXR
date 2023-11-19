@@ -64,14 +64,11 @@ namespace pimax_openxr {
             return XR_ERROR_HANDLE_INVALID;
         }
 
-        if (viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO &&
-            (m_primaryViewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO ||
-             viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO)) {
+        if (viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
             return XR_ERROR_VIEW_CONFIGURATION_TYPE_UNSUPPORTED;
         }
 
-        if (viewIndex >= (viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO ? xr::StereoView::Count
-                                                                                             : xr::QuadView::Count)) {
+        if (viewIndex >= xr::StereoView::Count) {
             return XR_ERROR_VALIDATION_FAILURE;
         }
 
@@ -81,14 +78,6 @@ namespace pimax_openxr {
                 LOG_TELEMETRY_ONCE(logUnimplemented("VisibilityMaskTypeNotSupported"));
             }
 
-            visibilityMask->vertexCountOutput = 0;
-            visibilityMask->indexCountOutput = 0;
-            return XR_SUCCESS;
-        }
-
-        // There is no mask for the focus area.
-        if (viewConfigurationType == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO &&
-            viewIndex >= xr::StereoView::Count) {
             visibilityMask->vertexCountOutput = 0;
             visibilityMask->indexCountOutput = 0;
             return XR_SUCCESS;
