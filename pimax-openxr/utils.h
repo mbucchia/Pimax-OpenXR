@@ -115,7 +115,7 @@ namespace xr {
             return "Not Supported";
 
         default:
-            return fmt::format("pvrResult_{}", result);
+            return fmt::format("pvrResult_{}", (int)result);
         }
     }
 
@@ -136,7 +136,7 @@ namespace xr {
             return "Failed";
 
         default:
-            return fmt::format("aSeeVRReturnCode_{}", result);
+            return fmt::format("aSeeVRReturnCode_{}", (int)result);
         }
     }
 #endif

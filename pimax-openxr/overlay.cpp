@@ -102,11 +102,7 @@ namespace pimax_openxr {
             const int batteryPercent =
                 pvr_getTrackedDeviceIntProperty(m_pvrSession, device, pvrTrackedDeviceProp_BatteryPercent_int, -1);
             if (batteryPercent >= 0) {
-                if (batteryPercent > 20) {
-                    return fmt::format(L"{}%", batteryPercent);
-                } else {
-                    return fmt::format(L"{}%  \x26A0", batteryPercent);
-                }
+                return xr::utf8_to_wide(fmt::format("{}%", batteryPercent)) + (batteryPercent > 20 ? L"" : L"  \x26A0");
             } else {
                 const int batteryLevel =
                     pvr_getTrackedDeviceIntProperty(m_pvrSession, device, pvrTrackedDeviceProp_BatteryLevel_int, -1);
@@ -150,7 +146,7 @@ namespace pimax_openxr {
             std::strftime(buf, sizeof(buf), "%H:%M", std::localtime(&now));
 
             m_fontNormal->DrawString(m_pvrSubmissionContext.Get(),
-                                     std::wstring(buf, buf + strlen(buf)).c_str(),
+                                     xr::utf8_to_wide(buf).c_str(),
                                      200.f,
                                      600.f,
                                      12.f,
@@ -182,7 +178,7 @@ namespace pimax_openxr {
 
         const auto fps = m_frameTimes.size();
         m_fontNormal->DrawString(m_pvrSubmissionContext.Get(),
-                                 fmt::format(L"{}", fps).c_str(),
+                                 xr::utf8_to_wide(fmt::format("{}", fps)).c_str(),
                                  150.f,
                                  1400.f,
                                  1098.f,
@@ -198,13 +194,14 @@ namespace pimax_openxr {
                                  color,
                                  FW1_RIGHT | FW1_NOFLUSH);
 
-        m_fontNormal->DrawString(m_pvrSubmissionContext.Get(),
-                                 fmt::format(L"{}x{}", m_proj0Extent.width, m_proj0Extent.height).c_str(),
-                                 150.f,
-                                 1400.f,
-                                 1754.f,
-                                 color,
-                                 FW1_RIGHT | FW1_NOFLUSH);
+        m_fontNormal->DrawString(
+            m_pvrSubmissionContext.Get(),
+            xr::utf8_to_wide(fmt::format("{}x{}", m_proj0Extent.width, m_proj0Extent.height)).c_str(),
+            150.f,
+            1400.f,
+            1754.f,
+            color,
+            FW1_RIGHT | FW1_NOFLUSH);
 
         m_fontNormal->Flush(m_pvrSubmissionContext.Get());
 

@@ -758,7 +758,7 @@ namespace pimax_openxr {
         ResetEvent(eventHandle.get());
     }
 
-    // Serialize commands from the D3D12 queue to the D3D11 context used by PVR.
+    // Serialize commands from the application context to the D3D11 context used by PVR.
     void OpenXrRuntime::serializeD3D11Frame() {
         if (m_pvrSubmissionDevice != m_d3d11Device) {
             m_fenceValue++;

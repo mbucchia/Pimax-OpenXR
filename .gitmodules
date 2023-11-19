@@ -19,3 +19,6 @@
 [submodule "external/Vulkan-SDK"]
 	path = external/Vulkan-SDK
 	url = https://github.com/mbucchia/Vulkan-SDK.git
+[submodule "external/fmt"]
+	path = external/fmt
+	url = https://github.com/fmtlib/fmt.git

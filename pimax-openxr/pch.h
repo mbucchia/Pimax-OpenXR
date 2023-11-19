@@ -110,6 +110,7 @@ using Microsoft::WRL::ComPtr;
 #include <detours.h>
 
 // FMT formatter.
+#define FMT_HEADER_ONLY
 #include <fmt/format.h>
 
 #ifndef NOASEEVRCLIENT
