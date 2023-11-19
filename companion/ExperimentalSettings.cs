@@ -81,8 +81,6 @@ namespace companion
                 }
                 // Convert value from microseconds to tenth of milliseconds.
                 timingBias.Value = multiplier == 0 ? ((int)key.GetValue("frame_time_override_offset", 0) / 100) : 0;
-                disableFramePipelining.Checked = (int)key.GetValue("quirk_disable_frame_pipelining", 0) == 1 ? true : false;
-                alwaysUseFrameIdZero.Checked = (int)key.GetValue("quirk_always_use_frame_id_zero", 0) == 1 ? true : false;
                 waitForGpuWorkInEndFrame.Checked = (int)key.GetValue("quirk_sync_gpu_work_in_end_frame", 0) == 1 ? true : false;
                 forceDisableParallelProjection.Checked = (int)key.GetValue("force_parallel_projection_state", 1) == 0 ? true : false;
                 droolonProjectionDistance.Value = (int)key.GetValue("droolon_projection_distance", 35);
@@ -201,26 +199,6 @@ namespace companion
             }
         }
 
-        private void disableFramePipelining_CheckedChanged(object sender, EventArgs e)
-        {
-            if (loading)
-            {
-                return;
-            }
-
-            MainForm.WriteSetting("quirk_disable_frame_pipelining", disableFramePipelining.Checked ? 1 : 0);
-        }
-
-        private void alwaysUseFrameIdZero_CheckedChanged(object sender, EventArgs e)
-        {
-            if (loading)
-            {
-                return;
-            }
-
-            MainForm.WriteSetting("quirk_always_use_frame_id_zero", alwaysUseFrameIdZero.Checked ? 1 : 0);
-        }
-
         private void waitForGpuWorkInEndFrame_CheckedChanged(object sender, EventArgs e)
         {
             if (loading)
@@ -287,8 +265,6 @@ namespace companion
                 key.DeleteValue("frame_time_filter_length", false);
                 key.DeleteValue("frame_time_override_multiplier", false);
                 key.DeleteValue("frame_time_override_offset", false);
-                key.DeleteValue("quirk_disable_frame_pipelining", false);
-                key.DeleteValue("quirk_always_use_frame_id_zero", false);
                 key.DeleteValue("quirk_sync_gpu_work_in_end_frame", false);
                 key.DeleteValue("force_parallel_projection_state", false);
                 key.DeleteValue("droolon_projection_distance", false);

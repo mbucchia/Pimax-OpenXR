@@ -128,42 +128,23 @@ namespace pimax_openxr {
                 m_needStartAsyncSubmissionThread = false;
             }
 
-            // Workaround: PVR since Pimax Client 1.10 is not handling frame pipelining correctly.
-            // Ensure a single frame in-flight.
-            bool skipPvrWait = false;
-            if (m_disableFramePipeliningQuirk) {
-                TraceLocalActivity(waitEndFrame);
-                TraceLoggingWriteStart(waitEndFrame,
-                                       "WaitEndFrame",
-                                       TLArg(m_frameWaited, "FrameWaited"),
-                                       TLArg(m_frameBegun, "FrameBegun"),
-                                       TLArg(m_frameCompleted, "FrameCompleted"));
-                const bool timedOut =
-                    !m_frameCondVar.wait_for(lock, 200ms, [&] { return m_frameCompleted == m_frameBegun; });
-                TraceLoggingWriteStop(waitEndFrame, "WaitEndFrame", TLArg(timedOut, "TimedOut"));
-
-                skipPvrWait = timedOut;
-            }
-
             // Wait for PVR to be ready for the next frame.
-            const long long pvrFrameId = !m_alwaysUseFrameIdZero ? m_frameWaited : 0;
+            const long long pvrFrameId = m_frameWaited;
             if (!m_useAsyncSubmission) {
-                if (!skipPvrWait) {
-                    TraceLocalActivity(waitToBeginFrame);
-                    TraceLoggingWriteStart(waitToBeginFrame, "PVR_WaitToBeginFrame", TLArg(pvrFrameId, "FrameId"));
-                    // Workaround: PVR will occasionally fail with result code -1 (undocumented) and the following log
-                    // message:
-                    //   [PVR] wait rendering complete event failed:258
-                    // Let's ignore this for now and hope for the best.
-                    lock.unlock();
-                    const auto result = pvr_waitToBeginFrame(m_pvrSession, pvrFrameId);
-                    lock.lock();
-                    if (result != pvr_success) {
-                        ErrorLog("pvr_waitToBeginFrame() failed with code: %s\n", xr::ToString(result).c_str());
-                    }
-                    TraceLoggingWriteStop(
-                        waitToBeginFrame, "PVR_WaitToBeginFrame", TLArg(xr::ToString(result).c_str(), "Result"));
+                TraceLocalActivity(waitToBeginFrame);
+                TraceLoggingWriteStart(waitToBeginFrame, "PVR_WaitToBeginFrame", TLArg(pvrFrameId, "FrameId"));
+                // Workaround: PVR will occasionally fail with result code -1 (undocumented) and the following log
+                // message:
+                //   [PVR] wait rendering complete event failed:258
+                // Let's ignore this for now and hope for the best.
+                lock.unlock();
+                const auto result = pvr_waitToBeginFrame(m_pvrSession, pvrFrameId);
+                lock.lock();
+                if (result != pvr_success) {
+                    ErrorLog("pvr_waitToBeginFrame() failed with code: %s\n", xr::ToString(result).c_str());
                 }
+                TraceLoggingWriteStop(
+                    waitToBeginFrame, "PVR_WaitToBeginFrame", TLArg(xr::ToString(result).c_str(), "Result"));
             } else {
                 if (!m_useDeferredFrameWaitThisFrame) {
                     waitForAsyncSubmissionIdle(m_useRunningStart);
@@ -264,7 +245,7 @@ namespace pimax_openxr {
             }
 
             // Tell PVR we are about to begin the frame.
-            const long long pvrFrameId = !m_alwaysUseFrameIdZero ? m_frameWaited - 1 : 0;
+            const long long pvrFrameId = m_frameWaited - 1;
             if (!m_useAsyncSubmission) {
                 TraceLocalActivity(beginFrame);
                 TraceLoggingWriteStart(beginFrame, "PVR_BeginFrame", TLArg(pvrFrameId, "FrameId"));
@@ -702,13 +683,7 @@ namespace pimax_openxr {
                     // Fill out pose and quad information.
                     if (xrSpace.referenceType != XR_REFERENCE_SPACE_TYPE_VIEW) {
                         XrPosef layerPose;
-                        if (!m_needWorldLockedQuadLayerQuirk) {
-                            locateSpace(*(Space*)quad->space, *m_originSpace, frameEndInfo->displayTime, layerPose);
-                        } else {
-                            // Workaround: use head-locked quads, otherwise PVR seems to misplace them in space.
-                            locateSpace(*(Space*)quad->space, *m_viewSpace, frameEndInfo->displayTime, layerPose);
-                            layer->Header.Flags |= pvrLayerFlag_HeadLocked;
-                        }
+                        locateSpace(*(Space*)quad->space, *m_originSpace, frameEndInfo->displayTime, layerPose);
                         layer->Quad.QuadPoseCenter = xrPoseToPvrPose(Pose::Multiply(quad->pose, layerPose));
                     } else {
                         layer->Quad.QuadPoseCenter = xrPoseToPvrPose(Pose::Multiply(quad->pose, xrSpace.poseInSpace));
@@ -743,17 +718,7 @@ namespace pimax_openxr {
 
                     // Place the guardian in 3D space as a 2D overlay.
                     XrSpaceLocation location{XR_TYPE_SPACE_LOCATION};
-                    if (!m_needWorldLockedQuadLayerQuirk) {
-                        layer.Quad.QuadPoseCenter = xrPoseToPvrPose(m_overlayPose);
-                    } else {
-                        // Workaround: use head-locked quads, otherwise PVR seems to misplace them in space.
-                        XrPosef viewToOrigin;
-                        XrSpaceLocationFlags locationFlags =
-                            locateSpace(*m_viewSpace, *m_originSpace, frameEndInfo->displayTime, viewToOrigin);
-                        layer.Quad.QuadPoseCenter =
-                            xrPoseToPvrPose(Pose::Multiply(m_overlayPose, Pose::Invert(viewToOrigin)));
-                        layer.Header.Flags |= pvrLayerFlag_HeadLocked;
-                    }
+                    layer.Quad.QuadPoseCenter = xrPoseToPvrPose(m_overlayPose);
                     layer.Quad.QuadSize.x = 0.5f;
                     layer.Quad.QuadSize.y =
                         layer.Quad.QuadSize.x * ((float)m_overlayExtent.height / m_overlayExtent.width);
@@ -787,14 +752,7 @@ namespace pimax_openxr {
 
                     // Place the guardian in 3D space as a 2D overlay.
                     XrSpaceLocation location{XR_TYPE_SPACE_LOCATION};
-                    if (!m_needWorldLockedQuadLayerQuirk) {
-                        layer.Quad.QuadPoseCenter = xrPoseToPvrPose(guardianToOrigin);
-                    } else {
-                        // Workaround: use head-locked quads, otherwise PVR seems to misplace them in space.
-                        layer.Quad.QuadPoseCenter =
-                            xrPoseToPvrPose(Pose::Multiply(guardianToOrigin, Pose::Invert(viewToOrigin)));
-                        layer.Header.Flags |= pvrLayerFlag_HeadLocked;
-                    }
+                    layer.Quad.QuadPoseCenter = xrPoseToPvrPose(guardianToOrigin);
                     layer.Quad.QuadSize.x = layer.Quad.QuadSize.y = m_guardianRadius * 2;
                 }
             }
@@ -852,7 +810,7 @@ namespace pimax_openxr {
                 pvr_setFloatConfig(m_pvrSession, "openvr_client_render_ms", renderMs);
             }
 
-            const long long pvrFrameId = !m_alwaysUseFrameIdZero ? m_frameBegun - 1 : 0;
+            const long long pvrFrameId = m_frameBegun - 1;
             if (!m_useAsyncSubmission) {
                 std::vector<pvrLayerHeader*> layers;
                 for (auto& layer : layersAllocator) {
@@ -941,7 +899,7 @@ namespace pimax_openxr {
 
         std::optional<long long> lastWaitedFrameId;
         while (true) {
-            const long long pvrFrameId = !m_alwaysUseFrameIdZero ? m_frameCompleted : 0;
+            const long long pvrFrameId = m_frameCompleted;
             {
                 // PVR doesn't like gaps in frame ID, but these can happen when an app intentionally discard a frame. So
                 // we make sure we never skip a frame ID.

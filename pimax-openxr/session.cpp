@@ -331,7 +331,7 @@ namespace pimax_openxr {
         }
 #endif
 
-        m_useAsyncSubmission = getSetting("async_submission").value_or(true);
+        m_useAsyncSubmission = !m_useApplicationDeviceForSubmission && getSetting("async_submission").value_or(true);
         m_needStartAsyncSubmissionThread = m_useAsyncSubmission;
         // Creation of the submission threads is deferred to the first xrWaitFrame() to accomodate OpenComposite quirks.
 
@@ -459,8 +459,6 @@ namespace pimax_openxr {
         } else {
             m_forcedInteractionProfile.reset();
         }
-
-        m_useAnalogGrip = getSetting("analog_grip").value_or(true);
 
         if (getSetting("guardian").value_or(true)) {
             m_guardianThreshold = getSetting("guardian_threshold").value_or(1100) / 1e3f;

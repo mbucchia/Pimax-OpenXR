@@ -538,10 +538,7 @@ namespace pimax_openxr {
         wil::unique_registry_watcher m_registryWatcher;
         bool m_loggedResolution{false};
         std::string m_applicationName;
-        bool m_needWorldLockedQuadLayerQuirk{false};
-        bool m_disableFramePipeliningQuirk{false};
         bool m_completeDiscardedFramesQuirk{false};
-        bool m_alwaysUseFrameIdZero{false};
         bool m_useApplicationDeviceForSubmission{true};
         bool m_isConformanceTest{false};
         EyeTracking m_eyeTrackingType{EyeTracking::None};
@@ -600,7 +597,6 @@ namespace pimax_openxr {
         Haptic m_currentVibration[xr::Side::Count];
         std::optional<ForcedInteractionProfile> m_forcedInteractionProfile;
         std::optional<ForcedInteractionProfile> m_lastForcedInteractionProfile;
-        bool m_useAnalogGrip{true};
         std::string m_debugControllerType;
         std::optional<double> m_isRecenteringPressed;
         int64_t m_frameTimeOverrideOffsetUs{0};

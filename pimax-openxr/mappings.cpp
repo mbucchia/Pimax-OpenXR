@@ -538,13 +538,7 @@ namespace pimax_openxr {
             source.buttonType = pvrButton_Grip;
         } else if (endsWith(path, "/input/squeeze/value") ||
                    (xrAction.type == XR_ACTION_TYPE_FLOAT_INPUT && endsWith(path, "/input/squeeze"))) {
-            if (m_useAnalogGrip) {
-                source.floatValue = m_cachedInputState.Grip;
-            } else {
-                // Workaround for bogus controller firmware.
-                source.buttonMap = m_cachedInputState.HandButtons;
-                source.buttonType = pvrButton_Grip;
-            }
+            source.floatValue = m_cachedInputState.Grip;
         } else if (endsWith(path, "/input/squeeze/force")) {
             source.floatValue = m_cachedInputState.GripForce;
         } else if (endsWith(path, "/input/trigger/click") ||

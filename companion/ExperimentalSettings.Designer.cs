@@ -42,8 +42,6 @@ namespace companion
             this.forceRateLabel = new System.Windows.Forms.Label();
             this.forceHalf = new System.Windows.Forms.CheckBox();
             this.forceThird = new System.Windows.Forms.CheckBox();
-            this.disableFramePipelining = new System.Windows.Forms.CheckBox();
-            this.alwaysUseFrameIdZero = new System.Windows.Forms.CheckBox();
             this.waitForGpuWorkInEndFrame = new System.Windows.Forms.CheckBox();
             this.forceDisableParallelProjection = new System.Windows.Forms.CheckBox();
             this.droolonProjectionDistanceValue = new System.Windows.Forms.TextBox();
@@ -70,8 +68,6 @@ namespace companion
             this.flowLayoutPanel1.Controls.Add(this.forceRateLabel);
             this.flowLayoutPanel1.Controls.Add(this.forceHalf);
             this.flowLayoutPanel1.Controls.Add(this.forceThird);
-            this.flowLayoutPanel1.Controls.Add(this.disableFramePipelining);
-            this.flowLayoutPanel1.Controls.Add(this.alwaysUseFrameIdZero);
             this.flowLayoutPanel1.Controls.Add(this.waitForGpuWorkInEndFrame);
             this.flowLayoutPanel1.Controls.Add(this.forceDisableParallelProjection);
             this.flowLayoutPanel1.Controls.Add(this.droolonProjectionDistanceValue);
@@ -211,41 +207,15 @@ namespace companion
             this.forceThird.UseVisualStyleBackColor = true;
             this.forceThird.CheckedChanged += new System.EventHandler(this.forceThird_CheckedChanged);
             // 
-            // disableFramePipelining
-            // 
-            this.disableFramePipelining.AutoSize = true;
-            this.flowLayoutPanel1.SetFlowBreak(this.disableFramePipelining, true);
-            this.disableFramePipelining.Location = new System.Drawing.Point(3, 196);
-            this.disableFramePipelining.Name = "disableFramePipelining";
-            this.disableFramePipelining.Padding = new System.Windows.Forms.Padding(3, 9, 0, 0);
-            this.disableFramePipelining.Size = new System.Drawing.Size(140, 26);
-            this.disableFramePipelining.TabIndex = 30;
-            this.disableFramePipelining.Text = "Disable frame pipelining";
-            this.disableFramePipelining.UseVisualStyleBackColor = true;
-            this.disableFramePipelining.CheckedChanged += new System.EventHandler(this.disableFramePipelining_CheckedChanged);
-            // 
-            // alwaysUseFrameIdZero
-            // 
-            this.alwaysUseFrameIdZero.AutoSize = true;
-            this.flowLayoutPanel1.SetFlowBreak(this.alwaysUseFrameIdZero, true);
-            this.alwaysUseFrameIdZero.Location = new System.Drawing.Point(3, 228);
-            this.alwaysUseFrameIdZero.Name = "alwaysUseFrameIdZero";
-            this.alwaysUseFrameIdZero.Padding = new System.Windows.Forms.Padding(3, 0, 0, 0);
-            this.alwaysUseFrameIdZero.Size = new System.Drawing.Size(144, 17);
-            this.alwaysUseFrameIdZero.TabIndex = 31;
-            this.alwaysUseFrameIdZero.Text = "Always use null frame ID";
-            this.alwaysUseFrameIdZero.UseVisualStyleBackColor = true;
-            this.alwaysUseFrameIdZero.CheckedChanged += new System.EventHandler(this.alwaysUseFrameIdZero_CheckedChanged);
-            // 
             // waitForGpuWorkInEndFrame
             // 
             this.waitForGpuWorkInEndFrame.AutoSize = true;
             this.flowLayoutPanel1.SetFlowBreak(this.waitForGpuWorkInEndFrame, true);
-            this.waitForGpuWorkInEndFrame.Location = new System.Drawing.Point(3, 251);
+            this.waitForGpuWorkInEndFrame.Location = new System.Drawing.Point(3, 196);
             this.waitForGpuWorkInEndFrame.Name = "waitForGpuWorkInEndFrame";
             this.waitForGpuWorkInEndFrame.Padding = new System.Windows.Forms.Padding(3, 0, 0, 0);
             this.waitForGpuWorkInEndFrame.Size = new System.Drawing.Size(193, 17);
-            this.waitForGpuWorkInEndFrame.TabIndex = 32;
+            this.waitForGpuWorkInEndFrame.TabIndex = 30;
             this.waitForGpuWorkInEndFrame.Text = "Wait for GPU work in EndFrame (*)";
             this.waitForGpuWorkInEndFrame.UseVisualStyleBackColor = true;
             this.waitForGpuWorkInEndFrame.CheckedChanged += new System.EventHandler(this.waitForGpuWorkInEndFrame_CheckedChanged);
@@ -254,18 +224,18 @@ namespace companion
             // 
             this.forceDisableParallelProjection.AutoSize = true;
             this.flowLayoutPanel1.SetFlowBreak(this.forceDisableParallelProjection, true);
-            this.forceDisableParallelProjection.Location = new System.Drawing.Point(3, 274);
+            this.forceDisableParallelProjection.Location = new System.Drawing.Point(3, 219);
             this.forceDisableParallelProjection.Name = "forceDisableParallelProjection";
             this.forceDisableParallelProjection.Padding = new System.Windows.Forms.Padding(3, 0, 0, 9);
             this.forceDisableParallelProjection.Size = new System.Drawing.Size(185, 26);
-            this.forceDisableParallelProjection.TabIndex = 33;
+            this.forceDisableParallelProjection.TabIndex = 31;
             this.forceDisableParallelProjection.Text = "Force disabling parallel projection";
             this.forceDisableParallelProjection.UseVisualStyleBackColor = true;
             this.forceDisableParallelProjection.CheckedChanged += new System.EventHandler(this.forceDisableParallelProjection_CheckedChanged);
             // 
             // droolonProjectionDistanceValue
             // 
-            this.droolonProjectionDistanceValue.Location = new System.Drawing.Point(6, 309);
+            this.droolonProjectionDistanceValue.Location = new System.Drawing.Point(6, 254);
             this.droolonProjectionDistanceValue.Margin = new System.Windows.Forms.Padding(6, 6, 3, 3);
             this.droolonProjectionDistanceValue.Name = "droolonProjectionDistanceValue";
             this.droolonProjectionDistanceValue.ReadOnly = true;
@@ -275,7 +245,7 @@ namespace companion
             // droolonProjectionDistanceLabel
             // 
             this.droolonProjectionDistanceLabel.AutoSize = true;
-            this.droolonProjectionDistanceLabel.Location = new System.Drawing.Point(44, 303);
+            this.droolonProjectionDistanceLabel.Location = new System.Drawing.Point(44, 248);
             this.droolonProjectionDistanceLabel.Name = "droolonProjectionDistanceLabel";
             this.droolonProjectionDistanceLabel.Padding = new System.Windows.Forms.Padding(0, 9, 0, 0);
             this.droolonProjectionDistanceLabel.Size = new System.Drawing.Size(169, 22);
@@ -286,7 +256,7 @@ namespace companion
             // 
             this.flowLayoutPanel1.SetFlowBreak(this.droolonProjectionDistance, true);
             this.droolonProjectionDistance.LargeChange = 10;
-            this.droolonProjectionDistance.Location = new System.Drawing.Point(219, 306);
+            this.droolonProjectionDistance.Location = new System.Drawing.Point(219, 251);
             this.droolonProjectionDistance.Margin = new System.Windows.Forms.Padding(3, 3, 3, 0);
             this.droolonProjectionDistance.Maximum = 200;
             this.droolonProjectionDistance.Minimum = 10;
@@ -302,7 +272,7 @@ namespace companion
             this.noRestartLabel.AutoSize = true;
             this.flowLayoutPanel1.SetFlowBreak(this.noRestartLabel, true);
             this.noRestartLabel.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.noRestartLabel.Location = new System.Drawing.Point(2, 351);
+            this.noRestartLabel.Location = new System.Drawing.Point(2, 296);
             this.noRestartLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.noRestartLabel.Name = "noRestartLabel";
             this.noRestartLabel.Padding = new System.Windows.Forms.Padding(3, 3, 0, 0);
@@ -312,7 +282,7 @@ namespace companion
             // 
             // restoreDefaults
             // 
-            this.restoreDefaults.Location = new System.Drawing.Point(6, 373);
+            this.restoreDefaults.Location = new System.Drawing.Point(6, 318);
             this.restoreDefaults.Margin = new System.Windows.Forms.Padding(6, 6, 3, 3);
             this.restoreDefaults.Name = "restoreDefaults";
             this.restoreDefaults.Size = new System.Drawing.Size(126, 39);
@@ -357,8 +327,6 @@ namespace companion
         private System.Windows.Forms.CheckBox forceHalf;
         private System.Windows.Forms.CheckBox forceThird;
         private System.Windows.Forms.Button restoreDefaults;
-        private System.Windows.Forms.CheckBox disableFramePipelining;
-        private System.Windows.Forms.CheckBox alwaysUseFrameIdZero;
         private System.Windows.Forms.CheckBox forceDisableParallelProjection;
         private System.Windows.Forms.Label droolonProjectionDistanceLabel;
         private System.Windows.Forms.TrackBar droolonProjectionDistance;
