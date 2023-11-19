@@ -118,7 +118,6 @@ namespace pimax_openxr {
         if (std::string_view(m_cachedHmdInfo.SerialNumber) != hmdInfo.SerialNumber) {
             m_cachedHmdInfo = hmdInfo;
             Log("Device is: %s\n", m_cachedHmdInfo.ProductName);
-            m_telemetry.logProduct(m_cachedHmdInfo.ProductName);
 
             // Important: anything below that set some state into the PVR session must be duplicated to
             // ensurePvrSession().

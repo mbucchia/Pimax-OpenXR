@@ -24,12 +24,10 @@
 
 #include "framework/dispatch.gen.h"
 
-#include "appinsights.h"
 #include "utils.h"
 
 namespace pimax_openxr {
 
-    using namespace pimax_openxr::appinsights;
     using namespace pimax_openxr::utils;
 
     const std::string RuntimeName = "pimax-openxr";
@@ -721,7 +719,6 @@ namespace pimax_openxr {
         bool m_isSmartSmoothingActive{false};
 
         // Statistics.
-        AppInsights m_telemetry;
         double m_sessionStartTime{0.0};
         uint64_t m_sessionTotalFrameCount{0};
         std::deque<double> m_frameTimes;
@@ -731,8 +728,6 @@ namespace pimax_openxr {
         std::unique_ptr<ITimer> m_gpuTimerApp[k_numGpuTimers];
         std::unique_ptr<ITimer> m_gpuTimerPrecomposition[k_numGpuTimers];
         uint32_t m_currentTimerIndex{0};
-
-        friend AppInsights* GetTelemetry();
     };
 
     // Singleton accessor.
@@ -740,9 +735,6 @@ namespace pimax_openxr {
 
     // A function to reset (delete) the singleton.
     void ResetInstance();
-
-    // Get telemetry object if available.
-    AppInsights* GetTelemetry();
 
     extern std::filesystem::path dllHome;
     extern std::filesystem::path localAppData;

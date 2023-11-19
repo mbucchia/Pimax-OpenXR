@@ -389,8 +389,6 @@ namespace pimax_openxr {
                 return XR_ERROR_PATH_UNSUPPORTED;
             }
 
-            LOG_TELEMETRY_ONCE(logFeature("EyeGazeInteraction"));
-
             // Eye tracker does not go through the controller mappings. Instead, we directly bind the action source.
             for (uint32_t i = 0; i < suggestedBindings->countSuggestedBindings; i++) {
                 const std::string& path = getXrPath(suggestedBindings->suggestedBindings[i].binding);

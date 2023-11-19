@@ -58,8 +58,6 @@ namespace pimax_openxr {
             return XR_ERROR_FUNCTION_UNSUPPORTED;
         }
 
-        LOG_TELEMETRY_ONCE(logFeature("VisibilityMask"));
-
         if (!m_sessionCreated || session != (XrSession)1) {
             return XR_ERROR_HANDLE_INVALID;
         }
@@ -74,10 +72,6 @@ namespace pimax_openxr {
 
         // We only support the hidden area mesh and we don't return a mask with parallel projection.
         if (visibilityMaskType != XR_VISIBILITY_MASK_TYPE_HIDDEN_TRIANGLE_MESH_KHR || m_useParallelProjection) {
-            if (!m_useParallelProjection) {
-                LOG_TELEMETRY_ONCE(logUnimplemented("VisibilityMaskTypeNotSupported"));
-            }
-
             visibilityMask->vertexCountOutput = 0;
             visibilityMask->indexCountOutput = 0;
             return XR_SUCCESS;

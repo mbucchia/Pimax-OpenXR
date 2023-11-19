@@ -141,27 +141,14 @@ namespace pimax_openxr {
         }
         refreshSettings();
 
-        {
-            const bool enableLighthouse = !!pvr_getIntConfig(m_pvrSession, "enable_lighthouse_tracking", 0);
-
-            TraceLoggingWrite(
-                g_traceProvider,
-                "PVR_Config",
-                TLArg(enableLighthouse, "EnableLighthouse"),
-                TLArg(m_fovLevel, "FovLevel"),
-                TLArg(m_useParallelProjection, "UseParallelProjection"),
-                TLArg(!!pvr_getIntConfig(m_pvrSession, "dbg_asw_enable", 0), "EnableSmartSmoothing"),
-                TLArg(pvr_getIntConfig(m_pvrSession, "dbg_force_framerate_divide_by", 1), "CompulsiveSmoothingRate"));
-
-            m_telemetry.logScenario(isD3D12Session()    ? "D3D12"
-                                    : isVulkanSession() ? "Vulkan"
-                                    : isOpenGLSession() ? "OpenGL"
-                                                        : "D3D11",
-                                    enableLighthouse,
-                                    m_fovLevel,
-                                    m_useParallelProjection,
-                                    m_useMirrorWindow);
-        }
+        TraceLoggingWrite(
+            g_traceProvider,
+            "PVR_Config",
+            TLArg(!!pvr_getIntConfig(m_pvrSession, "enable_lighthouse_tracking", 0), "EnableLighthouse"),
+            TLArg(m_fovLevel, "FovLevel"),
+            TLArg(m_useParallelProjection, "UseParallelProjection"),
+            TLArg(!!pvr_getIntConfig(m_pvrSession, "dbg_asw_enable", 0), "EnableSmartSmoothing"),
+            TLArg(pvr_getIntConfig(m_pvrSession, "dbg_force_framerate_divide_by", 1), "CompulsiveSmoothingRate"));
 
         m_sessionCreated = true;
 
@@ -235,8 +222,6 @@ namespace pimax_openxr {
             m_mirrorWindowThread.join();
             m_mirrorWindowThread = {};
         }
-
-        m_telemetry.logUsage(pvr_getTimeSeconds(m_pvr) - m_sessionStartTime, m_sessionTotalFrameCount);
 
 #ifndef NOASEEVRCLIENT
         // Stop the eye tracker.

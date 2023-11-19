@@ -55,9 +55,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CustomSetupActions.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Include="ExperimentalSettings.cs">
       <SubType>Form</SubType>
     </Compile>

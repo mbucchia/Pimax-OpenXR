@@ -53,8 +53,6 @@ namespace pimax_openxr {
             return XR_ERROR_FUNCTION_UNSUPPORTED;
         }
 
-        LOG_TELEMETRY_ONCE(logFeature("HandTracking"));
-
         if (!m_sessionCreated || session != (XrSession)1) {
             return XR_ERROR_HANDLE_INVALID;
         }

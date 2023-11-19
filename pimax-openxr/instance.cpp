@@ -162,14 +162,9 @@ namespace pimax_openxr {
         fmt::format("PimaxXR - v{}.{}.{}", RuntimeVersionMajor, RuntimeVersionMinor, RuntimeVersionPatch);
 
     OpenXrRuntime::OpenXrRuntime() {
-        if (getSetting("enable_telemetry").value_or(false)) {
-            m_telemetry.initialize();
-        }
-
         const auto runtimeVersion =
             xr::ToString(XR_MAKE_VERSION(RuntimeVersionMajor, RuntimeVersionMinor, RuntimeVersionPatch));
         TraceLoggingWrite(g_traceProvider, "PimaxXR", TLArg(runtimeVersion.c_str(), "Version"));
-        m_telemetry.logVersion(runtimeVersion);
 
         // Identify the version of Pitool or Pimax Client.
         const auto clientVersion = getPimaxClientVersion();
@@ -394,9 +389,7 @@ namespace pimax_openxr {
         Log("Application: %s; Engine: %s\n",
             createInfo->applicationInfo.applicationName,
             createInfo->applicationInfo.engineName);
-        m_telemetry.logApplicationInfo(createInfo->applicationInfo.applicationName,
-                                       createInfo->applicationInfo.engineName);
-
+\
         if (XR_VERSION_MAJOR(createInfo->applicationInfo.apiVersion) != XR_VERSION_1_0) {
             return XR_ERROR_API_VERSION_UNSUPPORTED;
         }
@@ -624,13 +617,6 @@ namespace pimax_openxr {
 
     void ResetInstance() {
         g_instance.reset();
-    }
-
-    AppInsights* GetTelemetry() {
-        if (g_instance) {
-            return &g_instance->m_telemetry;
-        }
-        return nullptr;
     }
 
 } // namespace pimax_openxr

@@ -21,12 +21,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_138E53E928D2441489C834FC90AB6CC1"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_3126812372A1450FA9D22531F4A91475"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -167,21 +161,6 @@
     {
         "CustomAction"
         {
-            "{4AA51A2D-7D85-4A59-BA75-B0809FC8B380}:_6509B9E8EE584DEA83DEE22E9938C0AA"
-            {
-            "Name" = "8:Primary output from companion (Active)"
-            "Condition" = "8:"
-            "Object" = "8:_40856ECB196C4B9BB81AAF93EFAA99D8"
-            "FileType" = "3:2"
-            "InstallAction" = "3:1"
-            "Arguments" = "8:"
-            "EntryPoint" = "8:"
-            "Sequence" = "3:1"
-            "Identifier" = "8:_83B207DD_1E59_4B5F_9094_D735210CEFF8"
-            "InstallerClass" = "11:TRUE"
-            "CustomActionData" = "8:"
-            "Run64Bit" = "11:TRUE"
-            }
         }
         "DefaultFeature"
         {
@@ -209,26 +188,6 @@
             {
             "SourcePath" = "8:..\\bin\\Win32\\Release\\pimax-openxr-32.dll"
             "TargetName" = "8:pimax-openxr-32.dll"
-            "Tag" = "8:"
-            "Folder" = "8:_FAFEF1A1283E4B448EB32163831E71D2"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
-            "IsolateTo" = "8:"
-            }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_138E53E928D2441489C834FC90AB6CC1"
-            {
-            "SourcePath" = "8:..\\bin\\x64\\Release\\pimax-openxr-curl.dll"
-            "TargetName" = "8:pimax-openxr-curl.dll"
             "Tag" = "8:"
             "Folder" = "8:_FAFEF1A1283E4B448EB32163831E71D2"
             "Condition" = "8:"

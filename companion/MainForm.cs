@@ -361,7 +361,6 @@ namespace companion
                 enableCompulsiveSmoothing.Checked = (int)key.GetValue("lock_framerate", 0) == 1 ? true : false;
                 allowEyeTracking.Checked = (int)key.GetValue("allow_eye_tracking", 0) == 1 ? true : false;
                 mirrorMode.Checked = (int)key.GetValue("mirror_window", 0) == 1 ? true : false;
-                enableTelemetry.Checked = (int)key.GetValue("enable_telemetry", 0) == 1 ? true : false;
 
                 // DO NOT FORGET TO ADD TO restoreDefaults_Click()!
             }
@@ -391,8 +390,7 @@ namespace companion
         {
             runtimeStatusLabel.Enabled = recenterMode.Enabled = recenterLabel.Enabled = controllerEmulation.Enabled = controllerEmulationLabel.Enabled =
                 joystickDeadzone.Enabled = joystickDeadzoneValue.Enabled = joystickLabel.Enabled = guardian.Enabled = preferFramerate.Enabled = enableCompulsiveSmoothing.Enabled = allowEyeTracking.Enabled =
-                downloadQuadViews.Enabled = downloadUltraleap.Enabled = mirrorMode.Enabled = enableTelemetry.Enabled = pitoolLabel.Enabled = telemetryLabel.Enabled =
-                runtimePimax.Checked;
+                downloadQuadViews.Enabled = downloadUltraleap.Enabled = mirrorMode.Enabled = pitoolLabel.Enabled = runtimePimax.Checked;
             guardianLabel1.Enabled = guardianLabel2.Enabled = guardianRadius.Enabled = guardianRadiusValue.Enabled = guardianThreshold.Enabled = guardianThresholdValue.Enabled = guardian.Enabled && guardian.Checked;
             enableQuadViews.Enabled = runtimePimax.Checked && quadViewsLayerPath != "";
             enableUltraleap.Enabled = runtimePimax.Checked && ultraleapLayerPath != "";
@@ -606,16 +604,6 @@ namespace companion
             }
 
             WriteSetting("mirror_window", mirrorMode.Checked ? 1 : 0);
-        }
-
-        private void enableTelemetry_CheckedChanged(object sender, EventArgs e)
-        {
-            if (loading)
-            {
-                return;
-            }
-
-            WriteSetting("enable_telemetry", enableTelemetry.Checked ? 1 : 0);
         }
 
         private void restoreDefaults_Click(object sender, EventArgs e)

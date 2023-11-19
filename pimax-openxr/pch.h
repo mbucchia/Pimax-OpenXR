@@ -118,11 +118,6 @@ using Microsoft::WRL::ComPtr;
 #include <aSeeVRUtility.h>
 #endif
 
-#ifndef NOCURL
-// libcurl
-#include <curl/curl.h>
-#endif
-
 // DirectXTex
 #include <DirectXTex.h>
 

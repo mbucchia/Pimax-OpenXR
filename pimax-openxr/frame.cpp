@@ -207,8 +207,6 @@ namespace pimax_openxr {
                               TLArg(m_frameCompleted, "FrameCompleted"));
         }
 
-        m_telemetry.tick();
-
         TraceLoggingWrite(g_traceProvider,
                           "xrWaitFrame",
                           TLArg(!!frameState->shouldRender, "ShouldRender"),
@@ -592,7 +590,6 @@ namespace pimax_openxr {
                                         TLArg(depth->farZ, "Far"),
                                         TLArg(depth->minDepth, "MinDepth"),
                                         TLArg(depth->maxDepth, "MaxDepth"));
-                                    LOG_TELEMETRY_ONCE(logFeature("Depth"));
 
                                     if (!m_swapchains.count(depth->subImage.swapchain)) {
                                         return XR_ERROR_HANDLE_INVALID;
@@ -676,9 +673,6 @@ namespace pimax_openxr {
 
                     // CONFORMANCE: We ignore eyeVisibility, since there is no equivalent in the PVR compositor.
                     // We cannot achieve conformance for this particular (but uncommon) API usage.
-                    if (quad->eyeVisibility != XR_EYE_VISIBILITY_BOTH) {
-                        LOG_TELEMETRY_ONCE(logUnimplemented("QuadEyeVisibilityNotSupported"));
-                    }
 
                     if (quad->subImage.imageArrayIndex >= xrSwapchain.xrDesc.arraySize) {
                         return XR_ERROR_VALIDATION_FAILURE;
