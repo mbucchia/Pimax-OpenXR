@@ -365,7 +365,6 @@ namespace pimax_openxr {
         std::optional<int> getSetting(const std::string& value) const;
 
         // system.cpp
-        void fillDisplayDeviceInfo();
         bool ensurePvrSession();
 
         // session.cpp

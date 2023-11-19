@@ -60,9 +60,6 @@ namespace pimax_openxr {
             return XR_ERROR_SYSTEM_INVALID;
         }
 
-        // Get the display device LUID.
-        fillDisplayDeviceInfo();
-
         // External objects require OpenGL 4.5.
         graphicsRequirements->minApiVersionSupported = XR_MAKE_VERSION(4, 0, 0);
         graphicsRequirements->maxApiVersionSupported = XR_MAKE_VERSION(5, 0, 0);

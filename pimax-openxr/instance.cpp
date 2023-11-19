@@ -30,56 +30,6 @@
 
 namespace {
 
-    using namespace pimax_openxr::log;
-
-    extern "C" NTSYSAPI NTSTATUS NTAPI NtSetTimerResolution(ULONG DesiredResolution,
-                                                            BOOLEAN SetResolution,
-                                                            PULONG CurrentResolution);
-    extern "C" NTSYSAPI NTSTATUS NTAPI NtQueryTimerResolution(PULONG MinimumResolution,
-                                                              PULONG MaximumResolution,
-                                                              PULONG CurrentResolution);
-
-    void InitializeHighPrecisionTimer() {
-        // https://stackoverflow.com/questions/3141556/how-to-setup-timer-resolution-to-0-5-ms
-        ULONG min, max, current;
-        NtQueryTimerResolution(&min, &max, &current);
-        TraceLoggingWrite(
-            g_traceProvider, "NtQueryTimerResolution", TLArg(min, "Min"), TLArg(max, "Max"), TLArg(current, "Current"));
-
-        ULONG currentRes;
-        NtSetTimerResolution(max, TRUE, &currentRes);
-
-        // https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation
-        // Enable HighQoS to achieve maximum performance, and turn off power saving.
-        {
-            PROCESS_POWER_THROTTLING_STATE PowerThrottling{};
-            PowerThrottling.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
-            PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
-            PowerThrottling.StateMask = 0;
-
-            SetProcessInformation(
-                GetCurrentProcess(), ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
-        }
-
-        // https://forums.oculusvr.com/t5/General/SteamVR-has-fixed-the-problems-with-Windows-11/td-p/956413
-        // Always honor Timer Resolution Requests. This is to ensure that the timer resolution set-up above sticks
-        // through transitions of the main window (eg: minimization).
-        {
-            // This setting was introduced in Windows 11 and the definition is not available in older headers.
-#ifndef PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION
-            const auto PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4U;
-#endif
-
-            PROCESS_POWER_THROTTLING_STATE PowerThrottling{};
-            PowerThrottling.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
-            PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
-            PowerThrottling.StateMask = 0;
-
-            SetProcessInformation(
-                GetCurrentProcess(), ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
-        }
-    }
-
     // A mock implementation of GetModuleFileNameA() that fakes being the SteamVR process.
     decltype(GetModuleFileNameA)* g_original_GetModuleFileNameA = nullptr;
     DWORD WINAPI hooked_GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize) {
@@ -245,15 +195,6 @@ namespace pimax_openxr {
             Log("HAGS is on\n");
         }
 
-        // Create the PVR session. Failing here is not considered fatal. We will try to initialize again during
-        // xrGetSystem(). This is to allow the application to create the instance and query its properties even if
-        // pi_server is not available.
-        if (pvr_createSession(m_pvr, &m_pvrSession) == pvr_success) {
-            if (pvr_getEyeHiddenAreaMesh(m_pvrSession, pvrEye_Left, nullptr, 0) == 0) {
-                Log("Hidden area mesh is not enabled\n");
-            }
-        }
-
         QueryPerformanceFrequency(&m_qpcFrequency);
 
         // Calibrate the timestamp conversion.
@@ -307,7 +248,6 @@ namespace pimax_openxr {
             // Workaround: the environment doesn't appear to be cleared when re-initializing PVR. Clear the one pointer
             // we care about.
             m_pvrSession->envh->pvr_dxgl_interface = nullptr;
-
             pvr_destroySession(m_pvrSession);
         }
         pvr_shutdown(m_pvr);
@@ -389,7 +329,7 @@ namespace pimax_openxr {
         Log("Application: %s; Engine: %s\n",
             createInfo->applicationInfo.applicationName,
             createInfo->applicationInfo.engineName);
-\
+
         if (XR_VERSION_MAJOR(createInfo->applicationInfo.apiVersion) != XR_VERSION_1_0) {
             return XR_ERROR_API_VERSION_UNSUPPORTED;
         }
@@ -630,7 +570,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     case DLL_PROCESS_ATTACH: {
         TraceLoggingRegister(pimax_openxr::log::g_traceProvider);
         DetourRestoreAfterWith();
-        InitializeHighPrecisionTimer();
+        pimax_openxr::utils::InitializeHighPrecisionTimer();
         DisableThreadLibraryCalls(hModule);
 
         // Detect presence of the Pimax Client (as opposed to Pitool).

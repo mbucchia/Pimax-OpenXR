@@ -151,9 +151,6 @@ namespace pimax_openxr {
             return XR_ERROR_SYSTEM_INVALID;
         }
 
-        // Get the display device LUID.
-        fillDisplayDeviceInfo();
-
         uint32_t deviceCount = 0;
         CHECK_VKCMD(vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr));
         std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -394,9 +391,6 @@ namespace pimax_openxr {
         if (!m_systemCreated || systemId != (XrSystemId)1) {
             return XR_ERROR_SYSTEM_INVALID;
         }
-
-        // Get the display device LUID.
-        fillDisplayDeviceInfo();
 
         if (!m_isConformanceTest) {
             graphicsRequirements->minApiVersionSupported = XR_MAKE_VERSION(1, 1, 0);

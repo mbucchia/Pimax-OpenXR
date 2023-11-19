@@ -59,7 +59,11 @@ namespace pimax_openxr {
             return XR_ERROR_LIMIT_REACHED;
         }
 
-        CHECK_MSG(ensurePvrSession(), "PVR session was lost");
+        // This should never happen if the app is properly polling xrGetSystem(). But there is still a tiny race
+        // condition window even if it does.
+        if (!ensurePvrSession()) {
+            return XR_ERROR_INITIALIZATION_FAILED;
+        }
 
         // Get the graphics device and initialize the necessary resources.
         bool hasGraphicsBindings = false;
@@ -284,14 +288,11 @@ namespace pimax_openxr {
 
         // Workaround: PVR ties the last use D3D device to the PVR session, and therefore we must teardown the previous
         // PVR session to clear that state.
-        {
-            // Workaround: the environment doesn't appear to be cleared when re-initializing PVR. Clear the one pointer
-            // we care about.
-            m_pvrSession->envh->pvr_dxgl_interface = nullptr;
-
-            pvr_destroySession(m_pvrSession);
-            m_pvrSession = nullptr;
-        }
+        // Workaround: the environment doesn't appear to be cleared when re-initializing PVR. Clear the one pointer
+        // we care about.
+        m_pvrSession->envh->pvr_dxgl_interface = nullptr;
+        pvr_destroySession(m_pvrSession);
+        m_pvrSession = nullptr;
 
         return XR_SUCCESS;
     }

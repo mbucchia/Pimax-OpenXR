@@ -69,6 +69,9 @@ namespace pimax_openxr {
 
             // If PVR Home took over the active session, then force re-creating our session in order to continue.
             if (status.ShouldQuit) {
+                // Workaround: the environment doesn't appear to be cleared when re-initializing PVR. Clear the one
+                // pointer we care about.
+                m_pvrSession->envh->pvr_dxgl_interface = nullptr;
                 pvr_destroySession(m_pvrSession);
                 m_pvrSession = nullptr;
             } else {
@@ -80,118 +83,6 @@ namespace pimax_openxr {
         if (!ensurePvrSession()) {
             m_cachedHmdInfo = {};
             return XR_ERROR_FORM_FACTOR_UNAVAILABLE;
-        }
-
-        // Check for HMD presence.
-        if (!isStatusValid) {
-            CHECK_PVRCMD(pvr_getHmdStatus(m_pvrSession, &status));
-            TraceLoggingWrite(g_traceProvider,
-                              "PVR_HmdStatus",
-                              TLArg(!!status.ServiceReady, "ServiceReady"),
-                              TLArg(!!status.HmdPresent, "HmdPresent"),
-                              TLArg(!!status.HmdMounted, "HmdMounted"),
-                              TLArg(!!status.IsVisible, "IsVisible"),
-                              TLArg(!!status.DisplayLost, "DisplayLost"),
-                              TLArg(!!status.ShouldQuit, "ShouldQuit"));
-        }
-        if (!(status.ServiceReady && status.HmdPresent)) {
-            m_cachedHmdInfo = {};
-            return XR_ERROR_FORM_FACTOR_UNAVAILABLE;
-        }
-
-        // Query HMD properties.
-        pvrHmdInfo hmdInfo{};
-        CHECK_PVRCMD(pvr_getHmdInfo(m_pvrSession, &hmdInfo));
-        TraceLoggingWrite(g_traceProvider,
-                          "PVR_HmdInfo",
-                          TLArg(hmdInfo.VendorId, "VendorId"),
-                          TLArg(hmdInfo.ProductId, "ProductId"),
-                          TLArg(hmdInfo.Manufacturer, "Manufacturer"),
-                          TLArg(hmdInfo.ProductName, "ProductName"),
-                          TLArg(hmdInfo.SerialNumber, "SerialNumber"),
-                          TLArg(hmdInfo.FirmwareMinor, "FirmwareMinor"),
-                          TLArg(hmdInfo.FirmwareMajor, "FirmwareMajor"),
-                          TLArg(hmdInfo.Resolution.w, "ResolutionWidth"),
-                          TLArg(hmdInfo.Resolution.h, "ResolutionHeight"));
-
-        // Detect if the device changed.
-        if (std::string_view(m_cachedHmdInfo.SerialNumber) != hmdInfo.SerialNumber) {
-            m_cachedHmdInfo = hmdInfo;
-            Log("Device is: %s\n", m_cachedHmdInfo.ProductName);
-
-            // Important: anything below that set some state into the PVR session must be duplicated to
-            // ensurePvrSession().
-
-            // Ensure there is no stale parallel projection settings.
-            CHECK_PVRCMD(pvr_setIntConfig(m_pvrSession, "view_rotation_fix", 0));
-
-            // Check that we have consent to share eye gaze data with applications.
-            m_isEyeTrackingAvailable = getSetting("allow_eye_tracking").value_or(false);
-
-            // Detect eye tracker. This can take a while, so only do it when the app is requesting it.
-            m_eyeTrackingType = EyeTracking::None;
-            if (has_XR_EXT_eye_gaze_interaction) {
-                if (getSetting("debug_eye_tracker").value_or(false)) {
-                    m_eyeTrackingType = EyeTracking::Simulated;
-                } else if (m_cachedHmdInfo.VendorId == 0x34A4 && m_cachedHmdInfo.ProductId == 0x0012) {
-                    // Pimax Crystal uses the PVR SDK.
-                    m_eyeTrackingType = EyeTracking::PVR;
-                }
-#ifndef NOASEEVRCLIENT
-                else if (initializeDroolon()) {
-                    // Other Pimax headsets use the 7invensun SDK (aSeeVR).
-                    m_eyeTrackingType = EyeTracking::aSeeVR;
-                }
-#endif
-            }
-            if (m_eyeTrackingType == EyeTracking::None) {
-                m_isEyeTrackingAvailable = false;
-            }
-
-            // Cache common information.
-            CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Left, &m_cachedEyeInfo[xr::StereoView::Left]));
-            CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Right, &m_cachedEyeInfo[xr::StereoView::Right]));
-
-            m_floorHeight = pvr_getFloatConfig(m_pvrSession, CONFIG_KEY_EYE_HEIGHT, 0.f);
-            TraceLoggingWrite(g_traceProvider,
-                              "PVR_GetConfig",
-                              TLArg(CONFIG_KEY_EYE_HEIGHT, "Config"),
-                              TLArg(m_floorHeight, "EyeHeight"));
-
-            const float cantingAngle = PVR::Quatf{m_cachedEyeInfo[xr::StereoView::Left].HmdToEyePose.Orientation}.Angle(
-                                           m_cachedEyeInfo[xr::StereoView::Right].HmdToEyePose.Orientation) /
-                                       2.f;
-            m_useParallelProjection =
-                cantingAngle > 0.0001f && getSetting("force_parallel_projection_state")
-                                              .value_or(!pvr_getIntConfig(m_pvrSession, "steamvr_use_native_fov", 0));
-            if (m_useParallelProjection) {
-                Log("Parallel projection is enabled\n");
-
-                // Per Pimax, we must set this value for parallel projection to work properly.
-                CHECK_PVRCMD(pvr_setIntConfig(m_pvrSession, "view_rotation_fix", 1));
-
-                // Update cached eye info to account for parallel projection.
-                CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Left, &m_cachedEyeInfo[xr::StereoView::Left]));
-                CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Right, &m_cachedEyeInfo[xr::StereoView::Right]));
-            }
-            m_fovLevel = pvr_getIntConfig(m_pvrSession, "fov_level", 0);
-
-            for (uint32_t i = 0; i < xr::StereoView::Count; i++) {
-                m_cachedEyeFov[i].angleDown = -atan(m_cachedEyeInfo[i].Fov.DownTan);
-                m_cachedEyeFov[i].angleUp = atan(m_cachedEyeInfo[i].Fov.UpTan);
-                m_cachedEyeFov[i].angleLeft = -atan(m_cachedEyeInfo[i].Fov.LeftTan);
-                m_cachedEyeFov[i].angleRight = atan(m_cachedEyeInfo[i].Fov.RightTan);
-
-                TraceLoggingWrite(g_traceProvider,
-                                  "PVR_EyeRenderInfo",
-                                  TLArg(i == xr::StereoView::Left ? "Left" : "Right", "Eye"),
-                                  TLArg(xr::ToString(m_cachedEyeInfo[i].HmdToEyePose).c_str(), "EyePose"),
-                                  TLArg(xr::ToString(m_cachedEyeFov[i]).c_str(), "Fov"),
-                                  TLArg(i == xr::StereoView::Left ? -cantingAngle : cantingAngle, "Canting"));
-            }
-
-            // Setup common parameters.
-            CHECK_PVRCMD(pvr_setTrackingOriginType(m_pvrSession, pvrTrackingOrigin_EyeLevel));
         }
 
         m_systemCreated = true;
@@ -336,33 +227,6 @@ namespace pimax_openxr {
         return XR_SUCCESS;
     }
 
-    // Retrieve some information from PVR needed for graphic/frame management.
-    void OpenXrRuntime::fillDisplayDeviceInfo() {
-        CHECK_MSG(ensurePvrSession(), "PVR session was lost");
-
-        pvrDisplayInfo info{};
-        CHECK_PVRCMD(pvr_getEyeDisplayInfo(m_pvrSession, pvrEye_Left, &info));
-        TraceLoggingWrite(g_traceProvider,
-                          "PVR_EyeDisplayInfo",
-                          TraceLoggingCharArray((char*)&info.luid, sizeof(LUID), "Luid"),
-                          TLArg(info.edid_vid, "EdidVid"),
-                          TLArg(info.edid_pid, "EdidPid"),
-                          TLArg(info.pos_x, "PosX"),
-                          TLArg(info.pos_y, "PosY"),
-                          TLArg(info.width, "Width"),
-                          TLArg(info.height, "Height"),
-                          TLArg(info.refresh_rate, "RefreshRate"),
-                          TLArg((int)info.disp_state, "DispState"),
-                          TLArg((int)info.eye_display, "EyeDisplay"),
-                          TLArg((int)info.eye_rotate, "EyeRotate"));
-
-        // We also store the expected frame duration.
-        m_displayRefreshRate = info.refresh_rate;
-        m_idealFrameDuration = m_predictedFrameDuration = 1.0 / info.refresh_rate;
-
-        memcpy(&m_adapterLuid, &info.luid, sizeof(LUID));
-    }
-
     bool OpenXrRuntime::ensurePvrSession() {
         if (!m_pvrSession) {
             const auto result = pvr_createSession(m_pvr, &m_pvrSession);
@@ -371,9 +235,132 @@ namespace pimax_openxr {
             if (result == pvrResult::pvr_rpc_failed) {
                 return false;
             }
-
             CHECK_PVRCMD(result);
-            CHECK_PVRCMD(pvr_setIntConfig(m_pvrSession, "view_rotation_fix", m_useParallelProjection));
+        }
+
+        // Check for HMD presence.
+        pvrHmdStatus status{};
+        CHECK_PVRCMD(pvr_getHmdStatus(m_pvrSession, &status));
+        TraceLoggingWrite(g_traceProvider,
+                          "PVR_HmdStatus",
+                          TLArg(!!status.ServiceReady, "ServiceReady"),
+                          TLArg(!!status.HmdPresent, "HmdPresent"),
+                          TLArg(!!status.HmdMounted, "HmdMounted"),
+                          TLArg(!!status.IsVisible, "IsVisible"),
+                          TLArg(!!status.DisplayLost, "DisplayLost"),
+                          TLArg(!!status.ShouldQuit, "ShouldQuit"));
+        if (!(status.ServiceReady && status.HmdPresent)) {
+            return false;
+        }
+
+        // Query HMD properties.
+        pvrHmdInfo hmdInfo{};
+        CHECK_PVRCMD(pvr_getHmdInfo(m_pvrSession, &hmdInfo));
+        TraceLoggingWrite(g_traceProvider,
+                          "PVR_HmdInfo",
+                          TLArg(hmdInfo.VendorId, "VendorId"),
+                          TLArg(hmdInfo.ProductId, "ProductId"),
+                          TLArg(hmdInfo.Manufacturer, "Manufacturer"),
+                          TLArg(hmdInfo.ProductName, "ProductName"),
+                          TLArg(hmdInfo.SerialNumber, "SerialNumber"),
+                          TLArg(hmdInfo.FirmwareMinor, "FirmwareMinor"),
+                          TLArg(hmdInfo.FirmwareMajor, "FirmwareMajor"),
+                          TLArg(hmdInfo.Resolution.w, "ResolutionWidth"),
+                          TLArg(hmdInfo.Resolution.h, "ResolutionHeight"));
+
+        // Detect if the device changed.
+        if (std::string_view(m_cachedHmdInfo.SerialNumber) != hmdInfo.SerialNumber) {
+            m_cachedHmdInfo = hmdInfo;
+            Log("Device is: %s\n", m_cachedHmdInfo.ProductName);
+
+            // Ensure there is no stale parallel projection settings.
+            CHECK_PVRCMD(pvr_setIntConfig(m_pvrSession, "view_rotation_fix", 0));
+
+            // Check that we have consent to share eye gaze data with applications.
+            m_isEyeTrackingAvailable = getSetting("allow_eye_tracking").value_or(false);
+
+            // Detect eye tracker. This can take a while, so only do it when the app is requesting it.
+            m_eyeTrackingType = EyeTracking::None;
+            if (has_XR_EXT_eye_gaze_interaction) {
+                if (getSetting("debug_eye_tracker").value_or(false)) {
+                    m_eyeTrackingType = EyeTracking::Simulated;
+                } else if (m_cachedHmdInfo.VendorId == 0x34A4 && m_cachedHmdInfo.ProductId == 0x0012) {
+                    // Pimax Crystal uses the PVR SDK.
+                    m_eyeTrackingType = EyeTracking::PVR;
+                }
+#ifndef NOASEEVRCLIENT
+                else if (initializeDroolon()) {
+                    // Other Pimax headsets use the 7invensun SDK (aSeeVR).
+                    m_eyeTrackingType = EyeTracking::aSeeVR;
+                }
+#endif
+            }
+            if (m_eyeTrackingType == EyeTracking::None) {
+                m_isEyeTrackingAvailable = false;
+            }
+
+            // Query the information needed for graphics.
+            pvrDisplayInfo info{};
+            CHECK_PVRCMD(pvr_getEyeDisplayInfo(m_pvrSession, pvrEye_Left, &info));
+            TraceLoggingWrite(g_traceProvider,
+                              "PVR_EyeDisplayInfo",
+                              TraceLoggingCharArray((char*)&info.luid, sizeof(LUID), "Luid"),
+                              TLArg(info.edid_vid, "EdidVid"),
+                              TLArg(info.edid_pid, "EdidPid"),
+                              TLArg(info.pos_x, "PosX"),
+                              TLArg(info.pos_y, "PosY"),
+                              TLArg(info.width, "Width"),
+                              TLArg(info.height, "Height"),
+                              TLArg(info.refresh_rate, "RefreshRate"),
+                              TLArg((int)info.disp_state, "DispState"),
+                              TLArg((int)info.eye_display, "EyeDisplay"),
+                              TLArg((int)info.eye_rotate, "EyeRotate"));
+            memcpy(&m_adapterLuid, &info.luid, sizeof(LUID));
+            m_displayRefreshRate = info.refresh_rate;
+            m_idealFrameDuration = m_predictedFrameDuration = 1.0 / info.refresh_rate;
+
+            CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Left, &m_cachedEyeInfo[xr::StereoView::Left]));
+            CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Right, &m_cachedEyeInfo[xr::StereoView::Right]));
+
+            // Determine the state of parallel projection.
+            const float cantingAngle = PVR::Quatf{m_cachedEyeInfo[xr::StereoView::Left].HmdToEyePose.Orientation}.Angle(
+                                           m_cachedEyeInfo[xr::StereoView::Right].HmdToEyePose.Orientation) /
+                                       2.f;
+            m_useParallelProjection =
+                cantingAngle > 0.0001f && getSetting("force_parallel_projection_state")
+                                              .value_or(!pvr_getIntConfig(m_pvrSession, "steamvr_use_native_fov", 0));
+            if (m_useParallelProjection) {
+                Log("Parallel projection is enabled\n");
+
+                // Per Pimax, we must set this value for parallel projection to work properly.
+                CHECK_PVRCMD(pvr_setIntConfig(m_pvrSession, "view_rotation_fix", 1));
+
+                // Update cached eye info to account for parallel projection.
+                CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Left, &m_cachedEyeInfo[xr::StereoView::Left]));
+                CHECK_PVRCMD(pvr_getEyeRenderInfo(m_pvrSession, pvrEye_Right, &m_cachedEyeInfo[xr::StereoView::Right]));
+            }
+            m_fovLevel = pvr_getIntConfig(m_pvrSession, "fov_level", 0);
+
+            for (uint32_t i = 0; i < xr::StereoView::Count; i++) {
+                m_cachedEyeFov[i].angleDown = -atan(m_cachedEyeInfo[i].Fov.DownTan);
+                m_cachedEyeFov[i].angleUp = atan(m_cachedEyeInfo[i].Fov.UpTan);
+                m_cachedEyeFov[i].angleLeft = -atan(m_cachedEyeInfo[i].Fov.LeftTan);
+                m_cachedEyeFov[i].angleRight = atan(m_cachedEyeInfo[i].Fov.RightTan);
+
+                TraceLoggingWrite(g_traceProvider,
+                                  "PVR_EyeRenderInfo",
+                                  TLArg(i == xr::StereoView::Left ? "Left" : "Right", "Eye"),
+                                  TLArg(xr::ToString(m_cachedEyeInfo[i].HmdToEyePose).c_str(), "EyePose"),
+                                  TLArg(xr::ToString(m_cachedEyeFov[i]).c_str(), "Fov"),
+                                  TLArg(i == xr::StereoView::Left ? -cantingAngle : cantingAngle, "Canting"));
+            }
+
+            // Setup tracking.
+            m_floorHeight = pvr_getFloatConfig(m_pvrSession, CONFIG_KEY_EYE_HEIGHT, 0.f);
+            TraceLoggingWrite(g_traceProvider,
+                              "PVR_GetConfig",
+                              TLArg(CONFIG_KEY_EYE_HEIGHT, "Config"),
+                              TLArg(m_floorHeight, "EyeHeight"));
             CHECK_PVRCMD(pvr_setTrackingOriginType(m_pvrSession, pvrTrackingOrigin_EyeLevel));
         }
 

@@ -198,6 +198,55 @@ namespace xr {
 
 namespace pimax_openxr::utils {
 
+    namespace {
+
+        extern "C" NTSYSAPI NTSTATUS NTAPI NtSetTimerResolution(ULONG DesiredResolution,
+                                                                BOOLEAN SetResolution,
+                                                                PULONG CurrentResolution);
+        extern "C" NTSYSAPI NTSTATUS NTAPI NtQueryTimerResolution(PULONG MinimumResolution,
+                                                                  PULONG MaximumResolution,
+                                                                  PULONG CurrentResolution);
+    } // namespace
+
+    static void InitializeHighPrecisionTimer() {
+        // https://stackoverflow.com/questions/3141556/how-to-setup-timer-resolution-to-0-5-ms
+        ULONG min, max, current;
+        NtQueryTimerResolution(&min, &max, &current);
+
+        ULONG currentRes;
+        NtSetTimerResolution(max, TRUE, &currentRes);
+
+        // https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation
+        // Enable HighQoS to achieve maximum performance, and turn off power saving.
+        {
+            PROCESS_POWER_THROTTLING_STATE PowerThrottling{};
+            PowerThrottling.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+            PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
+            PowerThrottling.StateMask = 0;
+
+            SetProcessInformation(
+                GetCurrentProcess(), ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
+        }
+
+        // https://forums.oculusvr.com/t5/General/SteamVR-has-fixed-the-problems-with-Windows-11/td-p/956413
+        // Always honor Timer Resolution Requests. This is to ensure that the timer resolution set-up above sticks
+        // through transitions of the main window (eg: minimization).
+        {
+            // This setting was introduced in Windows 11 and the definition is not available in older headers.
+#ifndef PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION
+            const auto PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4U;
+#endif
+
+            PROCESS_POWER_THROTTLING_STATE PowerThrottling{};
+            PowerThrottling.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+            PowerThrottling.ControlMask = PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
+            PowerThrottling.StateMask = 0;
+
+            SetProcessInformation(
+                GetCurrentProcess(), ProcessPowerThrottling, &PowerThrottling, sizeof(PowerThrottling));
+        }
+    }
+
     // A generic timer.
     struct ITimer {
         virtual ~ITimer() = default;
