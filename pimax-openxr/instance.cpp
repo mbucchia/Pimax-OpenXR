@@ -427,6 +427,7 @@ namespace pimax_openxr {
 
         // Game-specific quirks.
         m_needFocusFovCorrectionQuirk = m_applicationName == "DCS World";
+        m_isConformanceTest = m_applicationName == "conformance test";
 
         m_instanceCreated = true;
         *instance = (XrInstance)1;

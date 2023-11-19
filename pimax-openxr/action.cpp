@@ -277,12 +277,20 @@ namespace pimax_openxr {
             }
         }
 
+        std::set<XrPath> subactionPaths;
         for (uint32_t i = 0; i < createInfo->countSubactionPaths; i++) {
             const std::string& subactionPath = getXrPath(createInfo->subactionPaths[i]);
             if (subactionPath != "/user/hand/left" && subactionPath != "/user/hand/right" &&
+                subactionPath != "/user/gamepad" && subactionPath != "/user/head" &&
                 (!has_XR_EXT_eye_gaze_interaction || subactionPath != "/user/eyes_ext")) {
                 return XR_ERROR_PATH_UNSUPPORTED;
             }
+
+            if (subactionPaths.count(createInfo->subactionPaths[i])) {
+                return XR_ERROR_PATH_UNSUPPORTED;
+            }
+
+            subactionPaths.insert(createInfo->subactionPaths[i]);
         }
 
         // Create the internal struct.
@@ -908,14 +916,14 @@ namespace pimax_openxr {
         // TODO: Try to reduce contention here.
         std::unique_lock lock(m_actionsAndSpacesMutex);
 
-        bool doSide[2] = {false, false};
+        bool doSide[xr::Side::Count] = {false, false};
         for (uint32_t i = 0; i < syncInfo->countActiveActionSets; i++) {
             if (!m_activeActionSets.count(syncInfo->activeActionSets[i].actionSet)) {
                 return XR_ERROR_ACTIONSET_NOT_ATTACHED;
             }
 
             if (syncInfo->activeActionSets[i].subactionPath == XR_NULL_PATH) {
-                doSide[0] = doSide[1] = true;
+                doSide[xr::Side::Left] = doSide[xr::Side::Right] = true;
             } else {
                 const ActionSet& xrActionSet = *(ActionSet*)syncInfo->activeActionSets[i].actionSet;
 
@@ -938,7 +946,7 @@ namespace pimax_openxr {
         CHECK_PVRCMD(pvr_getInputState(m_pvrSession, &m_cachedInputState));
         bool wasRecenteringPressed = false;
         bool wasSystemPressed = false;
-        for (uint32_t side = 0; side < 2; side++) {
+        for (uint32_t side = 0; side < xr::Side::Count; side++) {
             if (!doSide[side]) {
                 continue;
             }
@@ -1018,14 +1026,33 @@ namespace pimax_openxr {
                 m_cachedInputState.HandButtons[side] &= ~(pvrButton_ApplicationMenu | pvrButton_Trigger);
                 m_cachedInputState.HandTouches[side] &= ~(pvrButton_ApplicationMenu | pvrButton_Trigger);
             }
+        }
 
-            // Propagate the input state to the entire action state.
-            for (uint32_t i = 0; i < syncInfo->countActiveActionSets; i++) {
-                ActionSet& xrActionSet = *(ActionSet*)syncInfo->activeActionSets[i].actionSet;
+        // Propagate the input state to the entire action state.
+        for (uint32_t i = 0; i < syncInfo->countActiveActionSets; i++) {
+            ActionSet& xrActionSet = *(ActionSet*)syncInfo->activeActionSets[i].actionSet;
 
-                xrActionSet.cachedInputState = m_cachedInputState;
+            xrActionSet.cachedInputState = m_cachedInputState;
+        }
+
+        // Re-assert haptics to OVR. We do this regardless of actionsets being synced.
+        const auto now = std::chrono::high_resolution_clock::now();
+        for (uint32_t side = 0; side < xr::Side::Count; side++) {
+            if (m_currentVibration[side].duration > 0) {
+                const bool isExpired =
+                    (now - m_currentVibration[side].startTime).count() >= m_currentVibration[side].duration;
+                if (isExpired) {
+                    m_currentVibration[side].amplitude = 0.f;
+                    m_currentVibration[side].duration = 0;
+                }
+
+                CHECK_PVRCMD(pvr_triggerHapticPulse(m_pvrSession,
+                                                    side == 0 ? pvrTrackedDevice_LeftController
+                                                              : pvrTrackedDevice_RightController,
+                                                    m_currentVibration[side].amplitude));
             }
         }
+
         m_lastForcedInteractionProfile = m_forcedInteractionProfile;
 
         // Execute built-in actions.
@@ -1167,6 +1194,11 @@ namespace pimax_openxr {
         } else {
             bool needSpace = false;
 
+            if ((getInfo->whichComponents & XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT)) {
+                localizedName += "Eye";
+                needSpace = true;
+            }
+
             if ((getInfo->whichComponents & XR_INPUT_SOURCE_LOCALIZED_NAME_INTERACTION_PROFILE_BIT)) {
                 localizedName += "Eye Gaze Interaction";
                 needSpace = true;
@@ -1269,13 +1301,21 @@ namespace pimax_openxr {
                                           TLArg(vibration->duration, "Duration"));
 
                         // NOTE: PVR only supports pulses, so there is nothing we can do with the
-                        // frequency/duration? OpenComposite seems to pass an amplitude of 0 sometimes, which is not
-                        // supported.
+                        // frequency.
+                        m_currentVibration[side].startTime = std::chrono::high_resolution_clock::now();
+                        m_currentVibration[side].amplitude = vibration->amplitude;
                         if (vibration->amplitude > 0) {
+                            // General recommendation is 20ms for short pulses.
+                            m_currentVibration[side].duration =
+                                vibration->duration == XR_MIN_HAPTIC_DURATION ? 20'000'000 : vibration->duration;
+
                             CHECK_PVRCMD(pvr_triggerHapticPulse(m_pvrSession,
                                                                 side == 0 ? pvrTrackedDevice_LeftController
                                                                           : pvrTrackedDevice_RightController,
                                                                 vibration->amplitude));
+                        } else {
+                            // OpenComposite seems to pass an amplitude of 0 sometimes. Assume this means stopping.
+                            m_currentVibration[side].duration = 0;
                         }
                         break;
                     }
@@ -1342,7 +1382,8 @@ namespace pimax_openxr {
             // We only support hands paths, not gamepad etc.
             const int side = getActionSide(fullPath);
             if (isOutput && side >= 0) {
-                // Nothing to do here.
+                m_currentVibration[side].amplitude = 0.f;
+                m_currentVibration[side].duration = 0;
             }
         }
 
@@ -1579,12 +1620,12 @@ namespace pimax_openxr {
 
     int OpenXrRuntime::getActionSide(const std::string& fullPath, bool allowExtraPaths) const {
         if (startsWith(fullPath, "/user/hand/left")) {
-            return 0;
+            return xr::Side::Left;
         } else if (startsWith(fullPath, "/user/hand/right")) {
-            return 1;
+            return xr::Side::Right;
         } else if (allowExtraPaths && (startsWith(fullPath, "/user/head") || startsWith(fullPath, "/user/gamepad") ||
                                        startsWith(fullPath, "/user/eyes_ext"))) {
-            return 2;
+            return xr::Side::Count;
         }
 
         return -1;

@@ -554,15 +554,14 @@ namespace pimax_openxr {
                 TraceLoggingWrite(g_traceProvider, "xrLocateSpace", TLArg(fullPath.c_str(), "ActionSourcePath"));
 
                 if (!isActionEyeTracker(fullPath)) {
-                    const bool isGripPose = endsWith(fullPath, "/input/grip/pose");
-                    const bool isAimPose = endsWith(fullPath, "/input/aim/pose");
+                    const bool isGripPose = endsWith(fullPath, "/input/grip/pose") || endsWith(fullPath, "/input/grip");
+                    const bool isAimPose = endsWith(fullPath, "/input/aim/pose") || endsWith(fullPath, "/input/aim");
                     const int side = getActionSide(fullPath);
                     if ((isGripPose || isAimPose) && side >= 0) {
                         result = getControllerPose(side, time, pose, velocity);
 
                         // Apply the pose offsets.
-                        const bool useAimPose = m_swapGripAimPoses ? isGripPose : isAimPose;
-                        if (useAimPose) {
+                        if (isAimPose) {
                             pose = Pose::Multiply(m_controllerAimPose[side], pose);
                         } else {
                             pose = Pose::Multiply(m_controllerGripPose[side], pose);

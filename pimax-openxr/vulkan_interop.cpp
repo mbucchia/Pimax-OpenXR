@@ -398,7 +398,12 @@ namespace pimax_openxr {
         // Get the display device LUID.
         fillDisplayDeviceInfo();
 
-        graphicsRequirements->minApiVersionSupported = XR_MAKE_VERSION(1, 1, 0);
+        if (!m_isConformanceTest) {
+            graphicsRequirements->minApiVersionSupported = XR_MAKE_VERSION(1, 1, 0);
+        } else {
+            // Quirk: the OpenXR CTS requires Vulkan 1.0 to be advertised as minimum.
+            graphicsRequirements->minApiVersionSupported = XR_MAKE_VERSION(1, 0, 0);
+        }
         graphicsRequirements->maxApiVersionSupported = XR_MAKE_VERSION(2, 0, 0);
 
         TraceLoggingWrite(

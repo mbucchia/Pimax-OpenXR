@@ -264,6 +264,26 @@ namespace pimax_openxr {
                 return false;
             });
         m_controllerValidPathsTable.insert_or_assign(
+            "/interaction_profiles/hp/mixed_reality_controller", [&](const std::string& path) {
+                if (path == "/user/hand/left/input/x/click" || path == "/user/hand/left/input/x" ||
+                    path == "/user/hand/left/input/y/click" || path == "/user/hand/left/input/y" ||
+                    path == "/user/hand/right/input/a/click" || path == "/user/hand/left/right/a" ||
+                    path == "/user/hand/right/input/b/click" || path == "/user/hand/left/right/b" ||
+                    endsWith(path, "/input/menu/click") || endsWith(path, "/input/menu") ||
+                    endsWith(path, "/input/squeeze/click") || endsWith(path, "/input/squeeze/value") ||
+                    endsWith(path, "/input/squeeze/force") || endsWith(path, "/input/squeeze") ||
+                    endsWith(path, "/input/trigger/click") || endsWith(path, "/input/trigger/value") ||
+                    endsWith(path, "/input/trigger") || endsWith(path, "/input/thumbstick") ||
+                    endsWith(path, "/input/thumbstick/x") || endsWith(path, "/input/thumbstick/y") ||
+                    endsWith(path, "/input/thumbstick/click") || endsWith(path, "/input/thumbstick/force") ||
+                    endsWith(path, "/input/thumbstick/touch") || endsWith(path, "/input/grip/pose") ||
+                    endsWith(path, "/input/grip") || endsWith(path, "/input/aim/pose") ||
+                    endsWith(path, "/input/aim") || endsWith(path, "/output/haptic")) {
+                    return true;
+                }
+                return false;
+            });
+        m_controllerValidPathsTable.insert_or_assign(
             "/interaction_profiles/google/daydream_controller", [](const std::string& path) {
                 if (endsWith(path, "/input/select/click") || endsWith(path, "/input/select") ||
                     endsWith(path, "/input/trackpad") || endsWith(path, "/input/trackpad/x") ||
@@ -431,6 +451,10 @@ namespace pimax_openxr {
         } else if (endsWith(path, "/input/trigger/touch")) {
             source.buttonMap = m_cachedInputState.HandTouches;
             source.buttonType = pvrButton_Trigger;
+        } else if (endsWith(path, "/input/thumbstick/click") ||
+                   (xrAction.type == XR_ACTION_TYPE_BOOLEAN_INPUT && endsWith(path, "/input/thumbstick"))) {
+            source.buttonMap = m_cachedInputState.HandButtons;
+            source.buttonType = pvrButton_JoyStick;
         } else if (endsWith(path, "/input/thumbstick")) {
             source.vector2fValue = m_cachedInputState.JoyStick;
             source.vector2fIndex = -1;
@@ -440,9 +464,6 @@ namespace pimax_openxr {
         } else if (endsWith(path, "/input/thumbstick/y")) {
             source.vector2fValue = m_cachedInputState.JoyStick;
             source.vector2fIndex = 1;
-        } else if (endsWith(path, "/input/thumbstick/click") || endsWith(path, "/input/thumbstick")) {
-            source.buttonMap = m_cachedInputState.HandButtons;
-            source.buttonType = pvrButton_JoyStick;
         } else if (endsWith(path, "/input/thumbstick/touch")) {
             source.buttonMap = m_cachedInputState.HandTouches;
             source.buttonType = pvrButton_JoyStick;

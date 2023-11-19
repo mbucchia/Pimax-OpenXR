@@ -677,7 +677,7 @@ namespace pimax_openxr::utils {
         }
     }
 
-    static inline bool isValidSwapchainRect(pvrTextureSwapChainDesc desc, XrRect2Di rect) {
+    static inline bool isValidSwapchainRect(pvrTextureSwapChainDesc desc, const XrRect2Di& rect) {
         if (rect.offset.x < 0 || rect.offset.y < 0 || rect.extent.width <= 0 || rect.extent.height <= 0) {
             return false;
         }

@@ -892,7 +892,7 @@ namespace RUNTIME_NAMESPACE {
 		}
 
 		TraceLoggingWriteStop(local, "xrSuggestInteractionProfileBindings", TLArg(xr::ToCString(result), "Result"));
-		if (XR_FAILED(result)) {
+		if (XR_FAILED(result) && result != XR_ERROR_PATH_UNSUPPORTED) {
 			ErrorLog("xrSuggestInteractionProfileBindings failed with %s\n", xr::ToCString(result));
 		}
 

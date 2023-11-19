@@ -173,11 +173,11 @@ namespace pimax_openxr {
 
         m_frameTimes.clear();
 
-        m_isControllerActive[0] = m_isControllerActive[1] = false;
-        m_controllerAimPose[0] = m_controllerGripPose[0] = m_controllerAimPose[1] = m_controllerGripPose[1] =
-            Pose::Identity();
-        rebindControllerActions(0);
-        rebindControllerActions(1);
+        m_isControllerActive[xr::Side::Left] = m_isControllerActive[xr::Side::Right] = false;
+        m_controllerAimPose[xr::Side::Left] = m_controllerGripPose[xr::Side::Left] =
+            m_controllerAimPose[xr::Side::Right] = m_controllerGripPose[xr::Side::Right] = Pose::Identity();
+        rebindControllerActions(xr::Side::Left);
+        rebindControllerActions(xr::Side::Right);
         m_activeActionSets.clear();
 
         m_sessionStartTime = pvr_getTimeSeconds(m_pvr);
@@ -537,8 +537,6 @@ namespace pimax_openxr {
 
         m_honorPremultiplyFlagOnProj0 = getSetting("honor_premultiply_flag_on_proj0").value_or(false);
 
-        m_swapGripAimPoses = getSetting("quirk_swap_grip_aim_poses").value_or(false);
-
         m_useRunningStart = !getSetting("quirk_disable_running_start").value_or(false);
 
         m_syncGpuWorkInEndFrame = getSetting("quirk_sync_gpu_work_in_end_frame").value_or(false);
@@ -559,7 +557,6 @@ namespace pimax_openxr {
             TLArg(m_lockFramerate, "LockFramerate"),
             TLArg(m_postProcessFocusView, "PostProcessFocusView"),
             TLArg(m_honorPremultiplyFlagOnProj0, "HonorPremultiplyFlagOnProj0"),
-            TLArg(m_swapGripAimPoses, "SwapGripAimPoses"),
             TLArg(m_useRunningStart, "UseRunningStart"),
             TLArg(m_syncGpuWorkInEndFrame, "SyncGpuWorkInEndFrame"));
 

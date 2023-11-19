@@ -656,7 +656,7 @@ namespace pimax_openxr {
                                     prepareAndCommitSwapchainImage(xrDepthSwapchain,
                                                                    i,
                                                                    depth->subImage.imageArrayIndex,
-                                                                   0,
+                                                                   XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT /* Not applicable for depth */,
                                                                    false,
                                                                    committedSwapchainImages);
                                     layer->EyeFovDepth.DepthTexture[pvrViewIndex] =
