@@ -283,6 +283,7 @@ namespace pimax_openxr {
         m_sessionCreated = false;
         m_sessionBegun = false;
         m_sessionLossPending = false;
+        m_numFramesWithDisplayLost = 0;
         m_sessionStopping = false;
         m_sessionExiting = false;
 

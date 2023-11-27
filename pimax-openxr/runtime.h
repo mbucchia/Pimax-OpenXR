@@ -567,6 +567,7 @@ namespace pimax_openxr {
         pvrHmdStatus m_hmdStatus{};
         bool m_sessionBegun{false};
         bool m_sessionLossPending{false};
+        uint32_t m_numFramesWithDisplayLost{0};
         bool m_sessionStopping{false};
         bool m_sessionExiting{false};
         bool m_useParallelProjection{false};

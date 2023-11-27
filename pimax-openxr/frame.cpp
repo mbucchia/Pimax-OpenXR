@@ -62,9 +62,15 @@ namespace pimax_openxr {
                           TLArg(!!m_hmdStatus.IsVisible, "IsVisible"),
                           TLArg(!!m_hmdStatus.DisplayLost, "DisplayLost"),
                           TLArg(!!m_hmdStatus.ShouldQuit, "ShouldQuit"));
+        // Debounce loss of HMD/display to allow hot-swapping of batteries with Pimax Crystal.
+        if (!m_hmdStatus.HmdPresent || m_hmdStatus.DisplayLost) {
+            m_numFramesWithDisplayLost++;
+        } else {
+            m_numFramesWithDisplayLost = 0;
+        }
         if (!m_sessionLossPending) {
-            m_sessionLossPending = !(m_hmdStatus.ServiceReady && m_hmdStatus.HmdPresent) || m_hmdStatus.DisplayLost ||
-                                   m_hmdStatus.ShouldQuit;
+            m_sessionLossPending =
+                !m_hmdStatus.ServiceReady || (m_numFramesWithDisplayLost > 10) || m_hmdStatus.ShouldQuit;
         }
         updateSessionState();
 
