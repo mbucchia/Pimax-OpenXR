@@ -1,5 +1,10 @@
 # PimaxXR: an implementation of the OpenXR standard for Pimax headsets
 
+> [!WARNING]
+> THIS PROJECT IS ABANDONED AND HAS BEEN SUPERSESDED BY PIMAX'S OWN IMPLEMENTATION DIRECTLY IN PIMAX PLAY.
+> 
+> The developer DOES NOT RECOMMEND that you use this project. There are several known limitations with newer devices such as the Pimax Crystal Super, which was released after this project ended.
+
 This program is an implementation of the OpenXR standard for Pimax headsets on Windows. It allows you to run OpenXR applications without SteamVR. It is not produced by Pimax.
 
 It is built on top of the official Pimax PVR native SDK and aims to provide a very fast and efficient implementation of the OpenXR standard for Pimax headsets.
